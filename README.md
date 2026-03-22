@@ -1,5 +1,24 @@
-# Vue 3 + Vite
+# Brusnika map
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+## Исследование работы с картой
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+В проекте реализован прототип для проверки базовых гео-сценариев:
+
+- визуализация объектов недвижимости маркерами;
+- рисование произвольного полигона кликами по карте;
+- определение попадания объектов в выделенную геозону.
+
+### Запуск
+
+```zsh
+cp .env.example .env.local
+npm run dev
+```
+
+### Как проверить
+
+1. Нажмите `Начать рисование`.
+2. Кликните по карте минимум 3 точки (вершины полигона).
+3. Нажмите `Завершить полигон`.
+4. Маркеры внутри полигона станут зелёными, счётчик `В зоне` обновится.
+5. Нажмите `Очистить`, чтобы сбросить геозону.
