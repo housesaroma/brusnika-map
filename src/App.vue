@@ -27,11 +27,35 @@
           <yandex-map-feature v-if="drawingLineFeature" :settings="drawingLineFeature" />
           <yandex-map-feature v-if="polygonFeature" :settings="polygonFeature" />
 
-          <yandex-map-feature
-            v-for="feature in propertyFeatures"
-            :key="feature.id"
-            :settings="feature.settings"
-          />
+          <yandex-map-marker
+            v-for="property in mockProperties"
+            :key="property.id"
+            :settings="{ coordinates: property.center }"
+            position="top left-center"
+          >
+            <div
+              class="property-marker"
+              :class="getMarkerClass(property.id)"
+              @mouseenter="setHoveredProperty(property.id)"
+              @mouseleave="clearHoveredProperty"
+              @click.stop="openPropertyDrawer(property.id)"
+            >
+              <span class="property-marker__price">{{ formatPrice(property.price) }}</span>
+
+              <article v-if="hoveredPropertyId === property.id" class="marker-hover-card">
+                <p class="marker-hover-card__address">
+                  {{ property.address || property.addressQuery }}
+                </p>
+                <p class="marker-hover-card__meta">Площадь: {{ formatArea(property.area) }}</p>
+                <img
+                  v-if="property.planUrl"
+                  :src="property.planUrl"
+                  :alt="`План ${property.name}`"
+                  class="marker-hover-card__image"
+                />
+              </article>
+            </div>
+          </yandex-map-marker>
         </yandex-map>
       </section>
 
@@ -44,18 +68,12 @@
           В зоне: <b>{{ propertiesInZone.length }}</b>
         </p>
         <p>
-          Координаты от Яндекс: <b>{{ geocodedCentersCount }}</b> / {{ mockProperties.length }}
-        </p>
-        <p>
-          Реальные контуры: <b>{{ realContoursCount }}</b> / {{ mockProperties.length }}
+          С координатами: <b>{{ locatedPropertiesCount }}</b> / {{ mockProperties.length }}
         </p>
         <p v-if="isPropertiesLoading">Загружаем объекты из локального JSON...</p>
         <p v-else-if="propertiesLoadError" class="panel__error">{{ propertiesLoadError }}</p>
         <p v-if="isCentersLoading">Уточняем координаты объектов через Яндекс...</p>
         <p v-else-if="centerLoadError" class="panel__error">{{ centerLoadError }}</p>
-        <p v-if="isContoursLoading">Загружаем реальные контуры зданий...</p>
-        <p v-else-if="contourLoadError" class="panel__error">{{ contourLoadError }}</p>
-
         <ul class="properties-list">
           <li
             v-for="property in propertiesInZone"
@@ -85,11 +103,33 @@
       </header>
 
       <div class="drawer__content">
-        <p><b>Класс:</b> {{ selectedProperty.className }}</p>
-        <p><b>Этажей:</b> {{ selectedProperty.floors }}</p>
-        <p><b>Квартир:</b> {{ selectedProperty.apartments }}</p>
-        <p>
-          <b>Средняя цена, ₽/м²:</b> {{ selectedProperty.pricePerMeter.toLocaleString('ru-RU') }}
+        <p><b>Адрес:</b> {{ selectedProperty.address || selectedProperty.addressQuery }}</p>
+        <p><b>Цена, ₽:</b> {{ selectedProperty.price.toLocaleString('ru-RU') }}</p>
+        <p><b>Цена за м², ₽:</b> {{ selectedProperty.pricePerMeter.toLocaleString('ru-RU') }}</p>
+        <p><b>Площадь:</b> {{ formatArea(selectedProperty.area) }}</p>
+        <p><b>Комнат:</b> {{ selectedProperty.rooms }}</p>
+        <p><b>Этаж:</b> {{ selectedProperty.floor }}</p>
+        <p><b>Тип:</b> {{ selectedProperty.propertyType }}</p>
+        <p><b>Сделка:</b> {{ selectedProperty.dealType }}</p>
+        <p><b>Статус:</b> {{ selectedProperty.status }}</p>
+        <p><b>Срок сдачи:</b> {{ selectedProperty.endOfBuilding || '—' }}</p>
+
+        <img
+          v-if="selectedProperty.planUrl"
+          :src="selectedProperty.planUrl"
+          :alt="`План ${selectedProperty.name}`"
+          class="drawer__image"
+        />
+
+        <p v-if="selectedProperty.url">
+          <b>Ссылка:</b>
+          <a :href="selectedProperty.url" target="_blank" rel="noopener noreferrer"
+            >Открыть объявление</a
+          >
+        </p>
+
+        <p v-if="selectedProperty.description" class="drawer__description">
+          {{ selectedProperty.description }}
         </p>
 
         <div class="drawer__section">
@@ -113,6 +153,7 @@ import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
   YandexMapDefaultFeaturesLayer,
+  YandexMapMarker,
   YandexMapFeature,
   YandexMapListener,
 } from 'vue-yandex-maps';
@@ -120,15 +161,8 @@ import {
 const map = shallowRef(null);
 const hasApiKey = Boolean(import.meta.env.VITE_YANDEX_MAPS_API_KEY);
 const yandexMapsApiKey = import.meta.env.VITE_YANDEX_MAPS_API_KEY || '';
-const overpassEndpoints = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.openstreetmap.ru/api/interpreter',
-];
-const contoursCacheKey = 'ekb-real-building-contours-v2';
 const centersCacheKey = 'ekb-geocoded-centers-v1';
 const localPropertiesDataUrl = '/data/parsing-properties.json';
-const maxContourMatchDistanceSquared = 0.00000144;
 
 const settings = {
   location: {
@@ -144,14 +178,13 @@ const drawingPoints = ref([]);
 const isPolygonClosed = ref(false);
 const selectedPropertyId = ref(null);
 const isDrawerOpen = ref(false);
+const hoveredPropertyId = ref(null);
 
 const isYandexMetaLoading = ref(false);
 const yandexMetaError = ref('');
 const yandexMetaByPropertyId = ref({});
 const isCentersLoading = ref(false);
 const centerLoadError = ref('');
-const isContoursLoading = ref(false);
-const contourLoadError = ref('');
 const isPropertiesLoading = ref(false);
 const propertiesLoadError = ref('');
 let activeGeocoderRequestId = 0;
@@ -163,12 +196,8 @@ const selectedProperty = computed(
   () => mockProperties.value.find((property) => property.id === selectedPropertyId.value) || null
 );
 
-const realContoursCount = computed(
-  () => mockProperties.value.filter((property) => property.contourSource === 'osm').length
-);
-
-const geocodedCentersCount = computed(
-  () => mockProperties.value.filter((property) => property.centerSource === 'yandex').length
+const locatedPropertiesCount = computed(
+  () => mockProperties.value.filter((property) => isValidCenter(property.center)).length
 );
 
 const selectedYandexMeta = computed(() => {
@@ -193,14 +222,7 @@ const listenerSettings = {
     }
 
     if (!isDrawing.value || isPolygonClosed.value) {
-      const foundProperty = mockProperties.value.find((property) =>
-        isPointInsidePolygon(coordinates, property.footprint)
-      );
-
-      if (foundProperty) {
-        openPropertyDrawer(foundProperty.id);
-      }
-
+      clearHoveredProperty();
       return;
     }
 
@@ -274,44 +296,6 @@ const propertiesInZone = computed(() =>
   mockProperties.value.filter((property) => insidePropertyIds.value.has(property.id))
 );
 
-const propertyFeatures = computed(() =>
-  mockProperties.value.map((property) => {
-    const isSelected = selectedPropertyId.value === property.id;
-    const isInsideZone = insidePropertyIds.value.has(property.id);
-    let fillColor = 'rgba(211, 47, 47, 0.2)';
-    let strokeColor = '#c62828';
-
-    if (isInsideZone) {
-      fillColor = 'rgba(46, 125, 50, 0.28)';
-      strokeColor = '#2e7d32';
-    }
-
-    if (isSelected) {
-      fillColor = 'rgba(255, 152, 0, 0.35)';
-      strokeColor = '#f57c00';
-    }
-
-    return {
-      id: property.id,
-      settings: {
-        geometry: {
-          type: 'Polygon',
-          coordinates: [property.footprint],
-        },
-        style: {
-          fill: fillColor,
-          stroke: [
-            {
-              color: strokeColor,
-              width: isSelected ? 3 : 2,
-            },
-          ],
-        },
-      },
-    };
-  })
-);
-
 const statusText = computed(() => {
   if (isDrawing.value) {
     return `Режим рисования: точек ${drawingPoints.value.length}`;
@@ -332,7 +316,6 @@ onMounted(async () => {
   }
 
   await resolvePropertyCenters();
-  await loadRealBuildingContours();
 });
 
 async function loadPropertiesFromFile() {
@@ -474,206 +457,6 @@ async function fetchPropertyCenterFromYandex(queryText) {
   }
 }
 
-async function loadRealBuildingContours() {
-  isContoursLoading.value = true;
-  contourLoadError.value = '';
-
-  try {
-    const cachedContours = getContoursCache();
-    if (cachedContours) {
-      mockProperties.value = mockProperties.value.map((property) => {
-        const cachedFootprint = cachedContours[property.id];
-        if (!cachedFootprint) {
-          return property;
-        }
-
-        return {
-          ...property,
-          footprint: cachedFootprint,
-          contourSource: 'osm',
-        };
-      });
-
-      return;
-    }
-
-    const ways = await fetchBuildingsInArea(
-      mockProperties.value.map((property) => property.center)
-    );
-
-    const updatedProperties = mockProperties.value.map((property) => {
-      const bestWay = findNearestWayForCenter(ways, property.center);
-      if (!bestWay) {
-        return property;
-      }
-
-      const distance = getDistanceToCenter(property.center, bestWay.geometry);
-      if (distance > maxContourMatchDistanceSquared) {
-        return property;
-      }
-
-      const footprint = geometryToRing(bestWay.geometry);
-      if (!footprint) {
-        return property;
-      }
-
-      return {
-        ...property,
-        footprint,
-        contourSource: 'osm',
-      };
-    });
-
-    mockProperties.value = updatedProperties;
-
-    const cachePayload = updatedProperties
-      .filter((property) => property.contourSource === 'osm')
-      .reduce((accumulator, property) => {
-        accumulator[property.id] = property.footprint;
-        return accumulator;
-      }, {});
-
-    if (Object.keys(cachePayload).length) {
-      setContoursCache(cachePayload);
-    }
-
-    if (!updatedProperties.some((property) => property.contourSource === 'osm')) {
-      contourLoadError.value =
-        'Не удалось загрузить реальные контуры, используем fallback-полигоны.';
-    }
-  } catch {
-    contourLoadError.value = 'Ошибка при загрузке контуров зданий. Используются fallback-полигоны.';
-  } finally {
-    isContoursLoading.value = false;
-  }
-}
-
-async function fetchBuildingsInArea(centers) {
-  const bbox = getCentersBoundingBox(centers, 0.005);
-  const query = `
-    [out:json][timeout:25];
-    way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-    out geom;
-  `;
-
-  return requestOverpassWays(query);
-}
-
-async function requestOverpassWays(query) {
-  for (const endpoint of overpassEndpoints) {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-          },
-          body: `data=${encodeURIComponent(query)}`,
-        });
-
-        if (response.status === 429) {
-          await sleep(1200 * (attempt + 1));
-          continue;
-        }
-
-        if (!response.ok) {
-          break;
-        }
-
-        const data = await response.json();
-        const ways = data?.elements?.filter(
-          (element) =>
-            element.type === 'way' &&
-            Array.isArray(element.geometry) &&
-            element.geometry.length >= 4
-        );
-
-        if (Array.isArray(ways)) {
-          return ways;
-        }
-      } catch {
-        await sleep(400 * (attempt + 1));
-      }
-    }
-  }
-
-  return [];
-}
-
-function findNearestWayForCenter(ways, center) {
-  if (!Array.isArray(ways) || !ways.length) {
-    return null;
-  }
-
-  const containingWay = ways.find((way) => {
-    const ring = geometryToRing(way.geometry);
-    if (!ring) {
-      return false;
-    }
-
-    return isPointInsidePolygon(center, ring);
-  });
-
-  if (containingWay) {
-    return containingWay;
-  }
-
-  return ways.reduce((closest, current) => {
-    const closestDistance = getDistanceToCenter(center, closest.geometry);
-    const currentDistance = getDistanceToCenter(center, current.geometry);
-    return currentDistance < closestDistance ? current : closest;
-  }, ways[0]);
-}
-
-function geometryToRing(geometry) {
-  const ring = geometry.map((point) => [point.lon, point.lat]);
-  if (!ring.length) {
-    return null;
-  }
-
-  const first = ring[0];
-  const last = ring[ring.length - 1];
-  if (first[0] !== last[0] || first[1] !== last[1]) {
-    ring.push(first);
-  }
-
-  return ring;
-}
-
-function getCentersBoundingBox(centers, padding = 0.003) {
-  const lngs = centers.map(([lng]) => lng);
-  const lats = centers.map(([, lat]) => lat);
-
-  return {
-    west: Math.min(...lngs) - padding,
-    south: Math.min(...lats) - padding,
-    east: Math.max(...lngs) + padding,
-    north: Math.max(...lats) + padding,
-  };
-}
-
-function getContoursCache() {
-  try {
-    const raw = sessionStorage.getItem(contoursCacheKey);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function setContoursCache(cacheValue) {
-  try {
-    sessionStorage.setItem(contoursCacheKey, JSON.stringify(cacheValue));
-  } catch {
-    return;
-  }
-}
-
 function getCentersCache() {
   try {
     const raw = sessionStorage.getItem(centersCacheKey);
@@ -702,24 +485,6 @@ function sleep(ms) {
   });
 }
 
-function getDistanceToCenter(center, geometry) {
-  const [centerLng, centerLat] = center;
-  const centroid = geometry.reduce(
-    (accumulator, point) => {
-      return [accumulator[0] + point.lon, accumulator[1] + point.lat];
-    },
-    [0, 0]
-  );
-
-  const avgLng = centroid[0] / geometry.length;
-  const avgLat = centroid[1] / geometry.length;
-
-  const deltaLng = avgLng - centerLng;
-  const deltaLat = avgLat - centerLat;
-
-  return deltaLng ** 2 + deltaLat ** 2;
-}
-
 function startDrawing() {
   isDrawing.value = true;
   isPolygonClosed.value = false;
@@ -743,6 +508,7 @@ function clearZone() {
 }
 
 function openPropertyDrawer(propertyId) {
+  hoveredPropertyId.value = null;
   selectedPropertyId.value = propertyId;
   isDrawerOpen.value = true;
 }
@@ -782,7 +548,6 @@ watch(
       }
 
       const data = await response.json();
-
       if (requestId !== activeGeocoderRequestId) {
         return;
       }
@@ -811,16 +576,38 @@ watch(
   { immediate: true }
 );
 
-function createRectangle(center, deltaLng, deltaLat) {
-  const [lng, lat] = center;
+function setHoveredProperty(propertyId) {
+  hoveredPropertyId.value = propertyId;
+}
 
-  return [
-    [lng - deltaLng, lat - deltaLat],
-    [lng + deltaLng, lat - deltaLat],
-    [lng + deltaLng, lat + deltaLat],
-    [lng - deltaLng, lat + deltaLat],
-    [lng - deltaLng, lat - deltaLat],
-  ];
+function clearHoveredProperty() {
+  hoveredPropertyId.value = null;
+}
+
+function getMarkerClass(propertyId) {
+  const isSelected = selectedPropertyId.value === propertyId;
+  const isInsideZone = insidePropertyIds.value.has(propertyId);
+
+  return {
+    'property-marker--selected': isSelected,
+    'property-marker--inside': isInsideZone,
+  };
+}
+
+function formatPrice(price) {
+  if (!Number.isFinite(price)) {
+    return '—';
+  }
+
+  return `${Math.round(price).toLocaleString('ru-RU')} ₽`;
+}
+
+function formatArea(area) {
+  if (!Number.isFinite(area)) {
+    return '—';
+  }
+
+  return `${area.toLocaleString('ru-RU')} м²`;
 }
 
 function isPointInsidePolygon(point, polygonRing) {
@@ -872,20 +659,32 @@ function normalizeParsedProperties(parsedProperties) {
   return parsedProperties.map((property, index) => {
     const parsedCenter = parseCoordsToLngLat(property?.coords);
     const center = parsedCenter || getFallbackCenter(index);
-    const floors = Number(property?.Floor);
+    const floor = Number(property?.Floor);
     const rooms = Number(property?.Rooms);
+    const area = Number(property?.Area);
+    const price = Number(property?.Price);
     const pricePerMeter = Number(property?.PPM);
 
     return {
-      id: property?.Id || `row-${index + 1}`,
+      id: String(property?.Id || `row-${index + 1}`),
       name: property?.zkName || `Объект ${index + 1}`,
       addressQuery: property?.Address || property?.zkName || 'Екатеринбург',
+      address: property?.Address || '',
       center,
       centerSource: parsedCenter ? 'parser' : 'fallback',
-      footprint: createRectangle(center, 0.0018, 0.0012),
-      contourSource: 'fallback',
+      price: Number.isFinite(price) ? Math.round(price) : 0,
+      area: Number.isFinite(area) ? area : 0,
+      rooms: Number.isFinite(rooms) ? rooms : 0,
+      floor: Number.isFinite(floor) ? floor : 0,
+      dealType: property?.DealType || 'unknown',
+      propertyType: property?.PropertyType || 'unknown',
+      status: property?.Status || 'unknown',
+      isApart: property?.isApart ?? null,
+      endOfBuilding: property?.EndOfBuilding || '',
+      planUrl: property?.planUrl || '',
+      url: property?.Url || '',
+      description: property?.Description || '',
       className: property?.PropertyType || 'unknown',
-      floors: Number.isFinite(floors) ? floors : 0,
       apartments: Number.isFinite(rooms) ? rooms : 0,
       pricePerMeter: Number.isFinite(pricePerMeter) ? Math.round(pricePerMeter) : 0,
     };
@@ -994,6 +793,69 @@ h1 {
   border: 1px solid #dedede;
   border-radius: 10px;
   overflow: hidden;
+}
+
+.property-marker {
+  position: relative;
+  transform: translate(-50%, -100%);
+  background: #ffffff;
+  border: 1px solid #d94444;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  cursor: pointer;
+  min-width: 78px;
+  text-align: center;
+}
+
+.property-marker--inside {
+  border-color: #2e7d32;
+}
+
+.property-marker--selected {
+  border-color: #f57c00;
+  box-shadow: 0 4px 14px rgba(245, 124, 0, 0.35);
+}
+
+.property-marker__price {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2d2d2d;
+  white-space: nowrap;
+}
+
+.marker-hover-card {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: 220px;
+  background: #fff;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  z-index: 5;
+}
+
+.marker-hover-card__address {
+  margin: 0;
+  font-size: 12px;
+  color: #333;
+}
+
+.marker-hover-card__meta {
+  margin: 6px 0;
+  font-size: 12px;
+  color: #555;
+}
+
+.marker-hover-card__image {
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  object-fit: cover;
+  border-radius: 6px;
 }
 
 .panel {
@@ -1118,6 +980,19 @@ h1 {
 
 .drawer__content p {
   margin: 0 0 10px;
+}
+
+.drawer__image {
+  width: 100%;
+  border-radius: 8px;
+  margin: 8px 0 12px;
+  object-fit: cover;
+  max-height: 220px;
+}
+
+.drawer__description {
+  white-space: pre-wrap;
+  line-height: 1.45;
 }
 
 .drawer__section {
