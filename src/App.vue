@@ -49,6 +49,8 @@
         <p>
           Реальные контуры: <b>{{ realContoursCount }}</b> / {{ mockProperties.length }}
         </p>
+        <p v-if="isPropertiesLoading">Загружаем объекты из локального JSON...</p>
+        <p v-else-if="propertiesLoadError" class="panel__error">{{ propertiesLoadError }}</p>
         <p v-if="isCentersLoading">Уточняем координаты объектов через Яндекс...</p>
         <p v-else-if="centerLoadError" class="panel__error">{{ centerLoadError }}</p>
         <p v-if="isContoursLoading">Загружаем реальные контуры зданий...</p>
@@ -125,6 +127,7 @@ const overpassEndpoints = [
 ];
 const contoursCacheKey = 'ekb-real-building-contours-v2';
 const centersCacheKey = 'ekb-geocoded-centers-v1';
+const localPropertiesDataUrl = '/data/parsing-properties.json';
 const maxContourMatchDistanceSquared = 0.00000144;
 
 const settings = {
@@ -134,112 +137,7 @@ const settings = {
   },
 };
 
-const mockProperties = ref([
-  {
-    id: 1,
-    name: 'ЖК Северный квартал',
-    addressQuery: 'Екатеринбург, улица Кузнецова, 21',
-    center: [60.5674, 56.8514],
-    centerSource: 'mock',
-    footprint: createRectangle([60.5674, 56.8514], 0.0024, 0.0015),
-    contourSource: 'fallback',
-    className: 'Комфорт',
-    floors: 25,
-    apartments: 420,
-    pricePerMeter: 178000,
-  },
-  {
-    id: 2,
-    name: 'ЖК Центр Сити',
-    addressQuery: 'Екатеринбург, улица Бориса Ельцина, 6',
-    center: [60.6038, 56.8387],
-    centerSource: 'mock',
-    footprint: createRectangle([60.6038, 56.8387], 0.0019, 0.0012),
-    contourSource: 'fallback',
-    className: 'Бизнес',
-    floors: 30,
-    apartments: 350,
-    pricePerMeter: 245000,
-  },
-  {
-    id: 3,
-    name: 'ЖК Южный парк',
-    addressQuery: 'Екатеринбург, улица Щорса, 103',
-    center: [60.6143, 56.8069],
-    centerSource: 'mock',
-    footprint: createRectangle([60.6143, 56.8069], 0.0026, 0.0016),
-    contourSource: 'fallback',
-    className: 'Комфорт',
-    floors: 20,
-    apartments: 510,
-    pricePerMeter: 165000,
-  },
-  {
-    id: 4,
-    name: 'ЖК ВИЗ Панорама',
-    addressQuery: 'Екатеринбург, улица Татищева, 49',
-    center: [60.5586, 56.8322],
-    centerSource: 'mock',
-    footprint: createRectangle([60.5586, 56.8322], 0.0021, 0.0013),
-    contourSource: 'fallback',
-    className: 'Комфорт+',
-    floors: 22,
-    apartments: 300,
-    pricePerMeter: 189000,
-  },
-  {
-    id: 5,
-    name: 'ЖК Пионерский',
-    addressQuery: 'Екатеринбург, улица Блюхера, 45',
-    center: [60.6432, 56.8498],
-    centerSource: 'mock',
-    footprint: createRectangle([60.6432, 56.8498], 0.0028, 0.0017),
-    contourSource: 'fallback',
-    className: 'Стандарт',
-    floors: 16,
-    apartments: 600,
-    pricePerMeter: 152000,
-  },
-  {
-    id: 6,
-    name: 'ЖК Ботанический',
-    addressQuery: 'Екатеринбург, улица Академика Шварца, 17',
-    center: [60.6194, 56.7968],
-    centerSource: 'mock',
-    footprint: createRectangle([60.6194, 56.7968], 0.0022, 0.0014),
-    contourSource: 'fallback',
-    className: 'Комфорт',
-    floors: 18,
-    apartments: 480,
-    pricePerMeter: 171000,
-  },
-  {
-    id: 7,
-    name: 'ЖК Уралмаш',
-    addressQuery: 'Екатеринбург, улица Победы, 16',
-    center: [60.6115, 56.8892],
-    centerSource: 'mock',
-    footprint: createRectangle([60.6115, 56.8892], 0.0025, 0.0016),
-    contourSource: 'fallback',
-    className: 'Стандарт',
-    floors: 14,
-    apartments: 720,
-    pricePerMeter: 139000,
-  },
-  {
-    id: 8,
-    name: 'ЖК Академический',
-    addressQuery: 'Екатеринбург, улица Вильгельма де Геннина, 37',
-    center: [60.5144, 56.7913],
-    centerSource: 'mock',
-    footprint: createRectangle([60.5144, 56.7913], 0.003, 0.0019),
-    contourSource: 'fallback',
-    className: 'Комфорт',
-    floors: 17,
-    apartments: 810,
-    pricePerMeter: 146000,
-  },
-]);
+const mockProperties = ref([]);
 
 const isDrawing = ref(false);
 const drawingPoints = ref([]);
@@ -254,6 +152,8 @@ const isCentersLoading = ref(false);
 const centerLoadError = ref('');
 const isContoursLoading = ref(false);
 const contourLoadError = ref('');
+const isPropertiesLoading = ref(false);
+const propertiesLoadError = ref('');
 let activeGeocoderRequestId = 0;
 
 const hasZone = computed(() => isPolygonClosed.value && drawingPoints.value.length >= 3);
@@ -378,6 +278,18 @@ const propertyFeatures = computed(() =>
   mockProperties.value.map((property) => {
     const isSelected = selectedPropertyId.value === property.id;
     const isInsideZone = insidePropertyIds.value.has(property.id);
+    let fillColor = 'rgba(211, 47, 47, 0.2)';
+    let strokeColor = '#c62828';
+
+    if (isInsideZone) {
+      fillColor = 'rgba(46, 125, 50, 0.28)';
+      strokeColor = '#2e7d32';
+    }
+
+    if (isSelected) {
+      fillColor = 'rgba(255, 152, 0, 0.35)';
+      strokeColor = '#f57c00';
+    }
 
     return {
       id: property.id,
@@ -387,14 +299,10 @@ const propertyFeatures = computed(() =>
           coordinates: [property.footprint],
         },
         style: {
-          fill: isSelected
-            ? 'rgba(255, 152, 0, 0.35)'
-            : isInsideZone
-              ? 'rgba(46, 125, 50, 0.28)'
-              : 'rgba(211, 47, 47, 0.2)',
+          fill: fillColor,
           stroke: [
             {
-              color: isSelected ? '#f57c00' : isInsideZone ? '#2e7d32' : '#c62828',
+              color: strokeColor,
               width: isSelected ? 3 : 2,
             },
           ],
@@ -417,9 +325,41 @@ const statusText = computed(() => {
 });
 
 onMounted(async () => {
+  await loadPropertiesFromFile();
+
+  if (!mockProperties.value.length) {
+    return;
+  }
+
   await resolvePropertyCenters();
   await loadRealBuildingContours();
 });
+
+async function loadPropertiesFromFile() {
+  isPropertiesLoading.value = true;
+  propertiesLoadError.value = '';
+
+  try {
+    const response = await fetch(localPropertiesDataUrl);
+    if (!response.ok) {
+      throw new Error('Не удалось открыть файл с объектами.');
+    }
+
+    const payload = await response.json();
+    const properties = Array.isArray(payload?.Properties) ? payload.Properties : [];
+    const normalized = normalizeParsedProperties(properties);
+
+    if (!normalized.length) {
+      throw new Error('В файле нет объектов для отображения.');
+    }
+
+    mockProperties.value = normalized;
+  } catch {
+    propertiesLoadError.value = 'Не удалось загрузить локальный JSON с объектами.';
+  } finally {
+    isPropertiesLoading.value = false;
+  }
+}
 
 async function resolvePropertyCenters() {
   isCentersLoading.value = true;
@@ -444,9 +384,18 @@ async function resolvePropertyCenters() {
       return;
     }
 
+    const unresolvedProperties = mockProperties.value.filter(
+      (property) => !isValidCenter(property.center)
+    );
+
+    if (!unresolvedProperties.length) {
+      return;
+    }
+
+    const geocodingQueue = unresolvedProperties.slice(0, 80);
     const updatedProperties = [];
 
-    for (const property of mockProperties.value) {
+    for (const property of geocodingQueue) {
       const center = await fetchPropertyCenterFromYandex(property.addressQuery || property.name);
       if (!center) {
         updatedProperties.push(property);
@@ -462,7 +411,14 @@ async function resolvePropertyCenters() {
       await sleep(120);
     }
 
-    mockProperties.value = updatedProperties;
+    const updatedById = updatedProperties.reduce((accumulator, property) => {
+      accumulator[property.id] = property;
+      return accumulator;
+    }, {});
+
+    mockProperties.value = mockProperties.value.map(
+      (property) => updatedById[property.id] || property
+    );
 
     const cachePayload = updatedProperties
       .filter((property) => property.centerSource === 'yandex')
@@ -477,10 +433,10 @@ async function resolvePropertyCenters() {
 
     if (!updatedProperties.some((property) => property.centerSource === 'yandex')) {
       centerLoadError.value =
-        'Не удалось уточнить координаты через Яндекс, используем мок-координаты.';
+        'Не удалось уточнить координаты через Яндекс, используем координаты из файла.';
     }
   } catch {
-    centerLoadError.value = 'Ошибка геокодирования Яндекс. Используем мок-координаты.';
+    centerLoadError.value = 'Ошибка геокодирования Яндекс. Используем координаты из файла.';
   } finally {
     isCentersLoading.value = false;
   }
@@ -910,6 +866,73 @@ function isPointOnSegment(point, segmentStart, segmentEnd) {
 
   const squaredLength = (x2 - x1) ** 2 + (y2 - y1) ** 2;
   return dotProduct <= squaredLength;
+}
+
+function normalizeParsedProperties(parsedProperties) {
+  return parsedProperties.map((property, index) => {
+    const parsedCenter = parseCoordsToLngLat(property?.coords);
+    const center = parsedCenter || getFallbackCenter(index);
+    const floors = Number(property?.Floor);
+    const rooms = Number(property?.Rooms);
+    const pricePerMeter = Number(property?.PPM);
+
+    return {
+      id: property?.Id || `row-${index + 1}`,
+      name: property?.zkName || `Объект ${index + 1}`,
+      addressQuery: property?.Address || property?.zkName || 'Екатеринбург',
+      center,
+      centerSource: parsedCenter ? 'parser' : 'fallback',
+      footprint: createRectangle(center, 0.0018, 0.0012),
+      contourSource: 'fallback',
+      className: property?.PropertyType || 'unknown',
+      floors: Number.isFinite(floors) ? floors : 0,
+      apartments: Number.isFinite(rooms) ? rooms : 0,
+      pricePerMeter: Number.isFinite(pricePerMeter) ? Math.round(pricePerMeter) : 0,
+    };
+  });
+}
+
+function parseCoordsToLngLat(rawCoords) {
+  if (typeof rawCoords !== 'string') {
+    return null;
+  }
+
+  const normalized = rawCoords.replaceAll(',', '.').replaceAll(/\s+/g, ' ').trim();
+  const [firstRaw, secondRaw] = normalized.split(' ');
+  const first = Number(firstRaw);
+  const second = Number(secondRaw);
+
+  if (!Number.isFinite(first) || !Number.isFinite(second)) {
+    return null;
+  }
+
+  if (Math.abs(first) <= 90 && Math.abs(second) <= 180) {
+    return [second, first];
+  }
+
+  if (Math.abs(first) <= 180 && Math.abs(second) <= 90) {
+    return [first, second];
+  }
+
+  return null;
+}
+
+function getFallbackCenter(index) {
+  const [baseLng, baseLat] = settings.location.center;
+  const columns = 28;
+  const offsetLng = ((index % columns) - columns / 2) * 0.0022;
+  const offsetLat = (Math.floor(index / columns) - 6) * 0.0017;
+
+  return [baseLng + offsetLng, baseLat + offsetLat];
+}
+
+function isValidCenter(center) {
+  return (
+    Array.isArray(center) &&
+    center.length === 2 &&
+    Number.isFinite(center[0]) &&
+    Number.isFinite(center[1])
+  );
 }
 </script>
 
