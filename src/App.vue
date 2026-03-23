@@ -28,29 +28,38 @@
           <yandex-map-feature v-if="polygonFeature" :settings="polygonFeature" />
 
           <yandex-map-marker
-            v-for="property in mockProperties"
-            :key="property.id"
-            :settings="{ coordinates: property.center }"
+            v-for="marker in displayedMarkers"
+            :key="marker.id"
+            :settings="{ coordinates: marker.center }"
             position="top left-center"
           >
             <div
               class="property-marker"
-              :class="getMarkerClass(property.id)"
-              @mouseenter="setHoveredProperty(property.id)"
+              :class="getMarkerClass(marker)"
+              @mouseenter="setHoveredProperty(marker)"
               @mouseleave="clearHoveredProperty"
-              @click.stop="openPropertyDrawer(property.id)"
+              @click.stop="handleMarkerClick(marker)"
             >
-              <span class="property-marker__price">{{ formatPrice(property.price) }}</span>
+              <span class="property-marker__price">{{ getMarkerLabel(marker) }}</span>
 
-              <article v-if="hoveredPropertyId === property.id" class="marker-hover-card">
+              <article
+                v-if="
+                  isPriceMode &&
+                  marker.kind === 'property' &&
+                  hoveredPropertyId === marker.property.id
+                "
+                class="marker-hover-card"
+              >
                 <p class="marker-hover-card__address">
-                  {{ property.address || property.addressQuery }}
+                  {{ marker.property.address || marker.property.addressQuery }}
                 </p>
-                <p class="marker-hover-card__meta">Площадь: {{ formatArea(property.area) }}</p>
+                <p class="marker-hover-card__meta">
+                  Площадь: {{ formatArea(marker.property.area) }}
+                </p>
                 <img
-                  v-if="property.planUrl"
-                  :src="property.planUrl"
-                  :alt="`План ${property.name}`"
+                  v-if="marker.property.planUrl"
+                  :src="marker.property.planUrl"
+                  :alt="`План ${marker.property.name}`"
                   class="marker-hover-card__image"
                 />
               </article>
@@ -187,6 +196,7 @@ const isCentersLoading = ref(false);
 const centerLoadError = ref('');
 const isPropertiesLoading = ref(false);
 const propertiesLoadError = ref('');
+const mapZoom = ref(settings.location.zoom);
 let activeGeocoderRequestId = 0;
 
 const hasZone = computed(() => isPolygonClosed.value && drawingPoints.value.length >= 3);
@@ -209,6 +219,11 @@ const selectedYandexMeta = computed(() => {
 });
 
 const listenerSettings = {
+  onUpdate: (event) => {
+    if (event?.location?.zoom) {
+      mapZoom.value = event.location.zoom;
+    }
+  },
   onClick: (_, mapEvent) => {
     const coordinates =
       mapEvent?.coordinates ||
@@ -295,6 +310,128 @@ const insidePropertyIds = computed(() => {
 const propertiesInZone = computed(() =>
   mockProperties.value.filter((property) => insidePropertyIds.value.has(property.id))
 );
+
+const mappableProperties = computed(() =>
+  mockProperties.value.filter((property) => isValidCenter(property.center))
+);
+
+const isPriceMode = computed(() => mapZoom.value >= 14);
+const isBuildingMode = computed(() => mapZoom.value >= 12 && mapZoom.value < 14);
+
+const buildingMarkers = computed(() => {
+  const grouped = new Map();
+
+  for (const property of mappableProperties.value) {
+    const key = getBuildingKey(property);
+    const existing = grouped.get(key);
+
+    if (existing) {
+      existing.properties.push(property);
+      existing.sumLng += property.center[0];
+      existing.sumLat += property.center[1];
+      continue;
+    }
+
+    grouped.set(key, {
+      key,
+      properties: [property],
+      sumLng: property.center[0],
+      sumLat: property.center[1],
+    });
+  }
+
+  return Array.from(grouped.values()).map((group) => ({
+    id: `building-${group.key}`,
+    kind: 'building',
+    count: group.properties.length,
+    propertyIds: group.properties.map((item) => item.id),
+    center: [group.sumLng / group.properties.length, group.sumLat / group.properties.length],
+  }));
+});
+
+const areaClusterMarkers = computed(() => {
+  if (!buildingMarkers.value.length) {
+    return [];
+  }
+
+  if (mapZoom.value <= 8.5) {
+    const totalCount = buildingMarkers.value.reduce((sum, marker) => sum + marker.count, 0);
+    const sumLng = buildingMarkers.value.reduce(
+      (sum, marker) => sum + marker.center[0] * marker.count,
+      0
+    );
+    const sumLat = buildingMarkers.value.reduce(
+      (sum, marker) => sum + marker.center[1] * marker.count,
+      0
+    );
+
+    return [
+      {
+        id: 'cluster-all',
+        kind: 'cluster',
+        count: totalCount,
+        propertyIds: buildingMarkers.value.flatMap((marker) => marker.propertyIds),
+        center: [sumLng / totalCount, sumLat / totalCount],
+      },
+    ];
+  }
+
+  const cellSize = getClusterCellSize(mapZoom.value);
+  const grouped = new Map();
+
+  for (const marker of buildingMarkers.value) {
+    const [lng, lat] = marker.center;
+    const gridX = Math.floor(lng / cellSize);
+    const gridY = Math.floor(lat / cellSize);
+    const key = `${gridX}:${gridY}`;
+    const existing = grouped.get(key);
+
+    if (existing) {
+      existing.markers.push(marker);
+      existing.sumLng += lng * marker.count;
+      existing.sumLat += lat * marker.count;
+      existing.count += marker.count;
+      existing.propertyIds.push(...marker.propertyIds);
+      continue;
+    }
+
+    grouped.set(key, {
+      key,
+      markers: [marker],
+      sumLng: lng * marker.count,
+      sumLat: lat * marker.count,
+      count: marker.count,
+      propertyIds: [...marker.propertyIds],
+    });
+  }
+
+  return Array.from(grouped.values()).map((group) => ({
+    id: `cluster-${group.key}`,
+    kind: 'cluster',
+    count: group.count,
+    propertyIds: group.propertyIds,
+    center: [group.sumLng / group.count, group.sumLat / group.count],
+  }));
+});
+
+const displayedMarkers = computed(() => {
+  if (isPriceMode.value) {
+    return mappableProperties.value.map((property) => ({
+      id: `property-${property.id}`,
+      kind: 'property',
+      count: 1,
+      propertyIds: [property.id],
+      property,
+      center: property.center,
+    }));
+  }
+
+  if (isBuildingMode.value) {
+    return buildingMarkers.value;
+  }
+
+  return areaClusterMarkers.value;
+});
 
 const statusText = computed(() => {
   if (isDrawing.value) {
@@ -576,22 +713,97 @@ watch(
   { immediate: true }
 );
 
-function setHoveredProperty(propertyId) {
-  hoveredPropertyId.value = propertyId;
+function setHoveredProperty(marker) {
+  if (!isPriceMode.value || marker.kind !== 'property') {
+    hoveredPropertyId.value = null;
+    return;
+  }
+
+  hoveredPropertyId.value = marker.property.id;
 }
 
 function clearHoveredProperty() {
   hoveredPropertyId.value = null;
 }
 
-function getMarkerClass(propertyId) {
-  const isSelected = selectedPropertyId.value === propertyId;
-  const isInsideZone = insidePropertyIds.value.has(propertyId);
+function getMarkerClass(marker) {
+  const hasSelected = Boolean(
+    selectedPropertyId.value && marker.propertyIds.includes(selectedPropertyId.value)
+  );
+  const hasInsideZone = marker.propertyIds.some((propertyId) =>
+    insidePropertyIds.value.has(propertyId)
+  );
 
   return {
-    'property-marker--selected': isSelected,
-    'property-marker--inside': isInsideZone,
+    'property-marker--selected': hasSelected,
+    'property-marker--inside': hasInsideZone,
+    'property-marker--count': marker.kind !== 'property',
+    'property-marker--cluster': marker.kind === 'cluster',
   };
+}
+
+function getMarkerLabel(marker) {
+  if (marker.kind === 'property') {
+    return formatPrice(marker.property.price);
+  }
+
+  return String(marker.count);
+}
+
+function handleMarkerClick(marker) {
+  if (marker.kind === 'property') {
+    openPropertyDrawer(marker.property.id);
+    return;
+  }
+
+  if (marker.propertyIds.length === 1) {
+    openPropertyDrawer(marker.propertyIds[0]);
+    return;
+  }
+
+  zoomToMarker(marker.center, marker.kind === 'cluster' ? 2 : 1);
+}
+
+function zoomToMarker(center, deltaZoom) {
+  const nextZoom = Math.min(18, mapZoom.value + deltaZoom);
+
+  if (!map.value || typeof map.value.update !== 'function') {
+    return;
+  }
+
+  map.value.update({
+    location: {
+      center,
+      zoom: nextZoom,
+      duration: 220,
+    },
+  });
+}
+
+function getBuildingKey(property) {
+  const rawAddress = property.address || property.addressQuery || '';
+  const normalizedAddress = rawAddress.trim().toLowerCase();
+  if (normalizedAddress) {
+    return normalizedAddress;
+  }
+
+  return `${property.center[0].toFixed(5)}:${property.center[1].toFixed(5)}`;
+}
+
+function getClusterCellSize(zoom) {
+  if (zoom <= 9.5) {
+    return 0.25;
+  }
+
+  if (zoom <= 10.5) {
+    return 0.14;
+  }
+
+  if (zoom <= 11.5) {
+    return 0.08;
+  }
+
+  return 0.04;
 }
 
 function formatPrice(price) {
