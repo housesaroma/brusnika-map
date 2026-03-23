@@ -100,8 +100,25 @@
       </section>
 
       <div v-else class="map-placeholder">
-        Укажите <code>VITE_YANDEX_MAPS_API_KEY</code> в <code>.env.local</code>, чтобы загрузить
-        карту.
+        <div class="map-placeholder__content">
+          <p class="map-placeholder__title">Введите API-ключ Яндекс Карт</p>
+          <p class="map-placeholder__hint">
+            Можно указать ключ один раз прямо в интерфейсе и начать пользоваться сайтом.
+          </p>
+          <input
+            v-model="runtimeApiKeyInput"
+            type="text"
+            class="map-placeholder__input"
+            placeholder="Например: 12345678-xxxx-xxxx-xxxx-1234567890ab"
+          />
+          <button type="button" class="map-placeholder__button" @click="applyRuntimeApiKey">
+            Сохранить и запустить карту
+          </button>
+          <p v-if="runtimeApiKeyError" class="map-placeholder__error">{{ runtimeApiKeyError }}</p>
+          <p class="map-placeholder__env">
+            Или задайте <code>VITE_YANDEX_MAPS_API_KEY</code> в <code>.env.local</code>.
+          </p>
+        </div>
       </div>
     </div>
 
@@ -166,10 +183,11 @@ import {
   YandexMapFeature,
   YandexMapListener,
 } from 'vue-yandex-maps';
+import { getYandexMapsApiKey, saveYandexMapsApiKey } from './utils/yandexApiKey';
 
 const map = shallowRef(null);
-const hasApiKey = Boolean(import.meta.env.VITE_YANDEX_MAPS_API_KEY);
-const yandexMapsApiKey = import.meta.env.VITE_YANDEX_MAPS_API_KEY || '';
+const yandexMapsApiKey = getYandexMapsApiKey();
+const hasApiKey = Boolean(yandexMapsApiKey);
 const centersCacheKey = 'ekb-geocoded-centers-v1';
 const localPropertiesDataUrl = '/data/parsing-properties.json';
 
@@ -197,6 +215,8 @@ const centerLoadError = ref('');
 const isPropertiesLoading = ref(false);
 const propertiesLoadError = ref('');
 const mapZoom = ref(settings.location.zoom);
+const runtimeApiKeyInput = ref('');
+const runtimeApiKeyError = ref('');
 let activeGeocoderRequestId = 0;
 
 const hasZone = computed(() => isPolygonClosed.value && drawingPoints.value.length >= 3);
@@ -945,6 +965,18 @@ function isValidCenter(center) {
     Number.isFinite(center[1])
   );
 }
+
+function applyRuntimeApiKey() {
+  const trimmedKey = runtimeApiKeyInput.value.trim();
+  if (!trimmedKey) {
+    runtimeApiKeyError.value = 'Введите API-ключ Яндекс Карт.';
+    return;
+  }
+
+  runtimeApiKeyError.value = '';
+  saveYandexMapsApiKey(trimmedKey);
+  window.location.reload();
+}
 </script>
 
 <style scoped>
@@ -1145,6 +1177,53 @@ h1 {
   border-radius: 8px;
   color: #444;
   background: #fafafa;
+}
+
+.map-placeholder__content {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-placeholder__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.map-placeholder__hint {
+  margin: 0;
+  color: #555;
+}
+
+.map-placeholder__input {
+  border: 1px solid #cbcbcb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.map-placeholder__button {
+  border: 1px solid #1565c0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #1565c0;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.map-placeholder__error {
+  margin: 0;
+  color: #b71c1c;
+  font-size: 13px;
+}
+
+.map-placeholder__env {
+  margin: 0;
+  color: #666;
+  font-size: 13px;
 }
 
 .drawer {
