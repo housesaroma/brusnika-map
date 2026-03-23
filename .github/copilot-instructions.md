@@ -7,6 +7,7 @@
 Инструмент для оценки рыночной стоимости недвижимости с визуализацией на карте.
 
 **Stack:**
+
 - Vue 3 (Composition API, `<script setup>`)
 - Vite 8
 - Yandex Maps API v3 (`vue-yandex-maps`)
@@ -93,6 +94,7 @@ npm run build
 ```
 
 If there are any errors or warnings:
+
 1. Fix immediately
 2. Do not leave broken code
 3. Re-run verification after fixes
@@ -103,6 +105,7 @@ If there are any errors or warnings:
 If confidence is below 90%, ask clarifying questions before implementation.
 
 Examples:
+
 - unclear target component
 - multiple valid approaches
 - ambiguous business logic
