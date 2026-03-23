@@ -43,6 +43,16 @@
         <p>
           В зоне: <b>{{ propertiesInZone.length }}</b>
         </p>
+        <p>
+          Координаты от Яндекс: <b>{{ geocodedCentersCount }}</b> / {{ mockProperties.length }}
+        </p>
+        <p>
+          Реальные контуры: <b>{{ realContoursCount }}</b> / {{ mockProperties.length }}
+        </p>
+        <p v-if="isCentersLoading">Уточняем координаты объектов через Яндекс...</p>
+        <p v-else-if="centerLoadError" class="panel__error">{{ centerLoadError }}</p>
+        <p v-if="isContoursLoading">Загружаем реальные контуры зданий...</p>
+        <p v-else-if="contourLoadError" class="panel__error">{{ contourLoadError }}</p>
 
         <ul class="properties-list">
           <li
@@ -96,7 +106,7 @@
 </template>
 
 <script setup>
-import { computed, shallowRef, ref, watch } from 'vue';
+import { computed, onMounted, shallowRef, ref, watch } from 'vue';
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
@@ -108,6 +118,14 @@ import {
 const map = shallowRef(null);
 const hasApiKey = Boolean(import.meta.env.VITE_YANDEX_MAPS_API_KEY);
 const yandexMapsApiKey = import.meta.env.VITE_YANDEX_MAPS_API_KEY || '';
+const overpassEndpoints = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter',
+];
+const contoursCacheKey = 'ekb-real-building-contours-v2';
+const centersCacheKey = 'ekb-geocoded-centers-v1';
+const maxContourMatchDistanceSquared = 0.00000144;
 
 const settings = {
   location: {
@@ -116,12 +134,15 @@ const settings = {
   },
 };
 
-const mockProperties = [
+const mockProperties = ref([
   {
     id: 1,
     name: 'ЖК Северный квартал',
+    addressQuery: 'Екатеринбург, улица Кузнецова, 21',
     center: [60.5674, 56.8514],
+    centerSource: 'mock',
     footprint: createRectangle([60.5674, 56.8514], 0.0024, 0.0015),
+    contourSource: 'fallback',
     className: 'Комфорт',
     floors: 25,
     apartments: 420,
@@ -130,8 +151,11 @@ const mockProperties = [
   {
     id: 2,
     name: 'ЖК Центр Сити',
+    addressQuery: 'Екатеринбург, улица Бориса Ельцина, 6',
     center: [60.6038, 56.8387],
+    centerSource: 'mock',
     footprint: createRectangle([60.6038, 56.8387], 0.0019, 0.0012),
+    contourSource: 'fallback',
     className: 'Бизнес',
     floors: 30,
     apartments: 350,
@@ -140,8 +164,11 @@ const mockProperties = [
   {
     id: 3,
     name: 'ЖК Южный парк',
+    addressQuery: 'Екатеринбург, улица Щорса, 103',
     center: [60.6143, 56.8069],
+    centerSource: 'mock',
     footprint: createRectangle([60.6143, 56.8069], 0.0026, 0.0016),
+    contourSource: 'fallback',
     className: 'Комфорт',
     floors: 20,
     apartments: 510,
@@ -150,8 +177,11 @@ const mockProperties = [
   {
     id: 4,
     name: 'ЖК ВИЗ Панорама',
+    addressQuery: 'Екатеринбург, улица Татищева, 49',
     center: [60.5586, 56.8322],
+    centerSource: 'mock',
     footprint: createRectangle([60.5586, 56.8322], 0.0021, 0.0013),
+    contourSource: 'fallback',
     className: 'Комфорт+',
     floors: 22,
     apartments: 300,
@@ -160,8 +190,11 @@ const mockProperties = [
   {
     id: 5,
     name: 'ЖК Пионерский',
+    addressQuery: 'Екатеринбург, улица Блюхера, 45',
     center: [60.6432, 56.8498],
+    centerSource: 'mock',
     footprint: createRectangle([60.6432, 56.8498], 0.0028, 0.0017),
+    contourSource: 'fallback',
     className: 'Стандарт',
     floors: 16,
     apartments: 600,
@@ -170,8 +203,11 @@ const mockProperties = [
   {
     id: 6,
     name: 'ЖК Ботанический',
+    addressQuery: 'Екатеринбург, улица Академика Шварца, 17',
     center: [60.6194, 56.7968],
+    centerSource: 'mock',
     footprint: createRectangle([60.6194, 56.7968], 0.0022, 0.0014),
+    contourSource: 'fallback',
     className: 'Комфорт',
     floors: 18,
     apartments: 480,
@@ -180,8 +216,11 @@ const mockProperties = [
   {
     id: 7,
     name: 'ЖК Уралмаш',
+    addressQuery: 'Екатеринбург, улица Победы, 16',
     center: [60.6115, 56.8892],
+    centerSource: 'mock',
     footprint: createRectangle([60.6115, 56.8892], 0.0025, 0.0016),
+    contourSource: 'fallback',
     className: 'Стандарт',
     floors: 14,
     apartments: 720,
@@ -190,14 +229,17 @@ const mockProperties = [
   {
     id: 8,
     name: 'ЖК Академический',
+    addressQuery: 'Екатеринбург, улица Вильгельма де Геннина, 37',
     center: [60.5144, 56.7913],
+    centerSource: 'mock',
     footprint: createRectangle([60.5144, 56.7913], 0.003, 0.0019),
+    contourSource: 'fallback',
     className: 'Комфорт',
     floors: 17,
     apartments: 810,
     pricePerMeter: 146000,
   },
-];
+]);
 
 const isDrawing = ref(false);
 const drawingPoints = ref([]);
@@ -208,13 +250,25 @@ const isDrawerOpen = ref(false);
 const isYandexMetaLoading = ref(false);
 const yandexMetaError = ref('');
 const yandexMetaByPropertyId = ref({});
+const isCentersLoading = ref(false);
+const centerLoadError = ref('');
+const isContoursLoading = ref(false);
+const contourLoadError = ref('');
 let activeGeocoderRequestId = 0;
 
 const hasZone = computed(() => isPolygonClosed.value && drawingPoints.value.length >= 3);
 const canFinishPolygon = computed(() => isDrawing.value && drawingPoints.value.length >= 3);
 
 const selectedProperty = computed(
-  () => mockProperties.find((property) => property.id === selectedPropertyId.value) || null
+  () => mockProperties.value.find((property) => property.id === selectedPropertyId.value) || null
+);
+
+const realContoursCount = computed(
+  () => mockProperties.value.filter((property) => property.contourSource === 'osm').length
+);
+
+const geocodedCentersCount = computed(
+  () => mockProperties.value.filter((property) => property.centerSource === 'yandex').length
 );
 
 const selectedYandexMeta = computed(() => {
@@ -239,7 +293,7 @@ const listenerSettings = {
     }
 
     if (!isDrawing.value || isPolygonClosed.value) {
-      const foundProperty = mockProperties.find((property) =>
+      const foundProperty = mockProperties.value.find((property) =>
         isPointInsidePolygon(coordinates, property.footprint)
       );
 
@@ -309,7 +363,7 @@ const insidePropertyIds = computed(() => {
   }
 
   const polygon = closedPolygonCoordinates.value;
-  const ids = mockProperties
+  const ids = mockProperties.value
     .filter((property) => isPointInsidePolygon(property.center, polygon))
     .map((property) => property.id);
 
@@ -317,11 +371,11 @@ const insidePropertyIds = computed(() => {
 });
 
 const propertiesInZone = computed(() =>
-  mockProperties.filter((property) => insidePropertyIds.value.has(property.id))
+  mockProperties.value.filter((property) => insidePropertyIds.value.has(property.id))
 );
 
 const propertyFeatures = computed(() =>
-  mockProperties.map((property) => {
+  mockProperties.value.map((property) => {
     const isSelected = selectedPropertyId.value === property.id;
     const isInsideZone = insidePropertyIds.value.has(property.id);
 
@@ -361,6 +415,354 @@ const statusText = computed(() => {
 
   return 'Геозона не задана';
 });
+
+onMounted(async () => {
+  await resolvePropertyCenters();
+  await loadRealBuildingContours();
+});
+
+async function resolvePropertyCenters() {
+  isCentersLoading.value = true;
+  centerLoadError.value = '';
+
+  try {
+    const cachedCenters = getCentersCache();
+    if (cachedCenters) {
+      mockProperties.value = mockProperties.value.map((property) => {
+        const cachedCenter = cachedCenters[property.id];
+        if (!cachedCenter) {
+          return property;
+        }
+
+        return {
+          ...property,
+          center: cachedCenter,
+          centerSource: 'yandex',
+        };
+      });
+
+      return;
+    }
+
+    const updatedProperties = [];
+
+    for (const property of mockProperties.value) {
+      const center = await fetchPropertyCenterFromYandex(property.addressQuery || property.name);
+      if (!center) {
+        updatedProperties.push(property);
+        continue;
+      }
+
+      updatedProperties.push({
+        ...property,
+        center,
+        centerSource: 'yandex',
+      });
+
+      await sleep(120);
+    }
+
+    mockProperties.value = updatedProperties;
+
+    const cachePayload = updatedProperties
+      .filter((property) => property.centerSource === 'yandex')
+      .reduce((accumulator, property) => {
+        accumulator[property.id] = property.center;
+        return accumulator;
+      }, {});
+
+    if (Object.keys(cachePayload).length) {
+      setCentersCache(cachePayload);
+    }
+
+    if (!updatedProperties.some((property) => property.centerSource === 'yandex')) {
+      centerLoadError.value =
+        'Не удалось уточнить координаты через Яндекс, используем мок-координаты.';
+    }
+  } catch {
+    centerLoadError.value = 'Ошибка геокодирования Яндекс. Используем мок-координаты.';
+  } finally {
+    isCentersLoading.value = false;
+  }
+}
+
+async function fetchPropertyCenterFromYandex(queryText) {
+  if (!yandexMapsApiKey) {
+    return null;
+  }
+
+  const scopedQuery = `${queryText}, Екатеринбург`;
+  const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${yandexMapsApiKey}&format=json&geocode=${encodeURIComponent(scopedQuery)}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const pos =
+      data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject?.Point?.pos || '';
+
+    const [lngRaw, latRaw] = pos.split(' ');
+    const lng = Number(lngRaw);
+    const lat = Number(latRaw);
+
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      return null;
+    }
+
+    return [lng, lat];
+  } catch {
+    return null;
+  }
+}
+
+async function loadRealBuildingContours() {
+  isContoursLoading.value = true;
+  contourLoadError.value = '';
+
+  try {
+    const cachedContours = getContoursCache();
+    if (cachedContours) {
+      mockProperties.value = mockProperties.value.map((property) => {
+        const cachedFootprint = cachedContours[property.id];
+        if (!cachedFootprint) {
+          return property;
+        }
+
+        return {
+          ...property,
+          footprint: cachedFootprint,
+          contourSource: 'osm',
+        };
+      });
+
+      return;
+    }
+
+    const ways = await fetchBuildingsInArea(
+      mockProperties.value.map((property) => property.center)
+    );
+
+    const updatedProperties = mockProperties.value.map((property) => {
+      const bestWay = findNearestWayForCenter(ways, property.center);
+      if (!bestWay) {
+        return property;
+      }
+
+      const distance = getDistanceToCenter(property.center, bestWay.geometry);
+      if (distance > maxContourMatchDistanceSquared) {
+        return property;
+      }
+
+      const footprint = geometryToRing(bestWay.geometry);
+      if (!footprint) {
+        return property;
+      }
+
+      return {
+        ...property,
+        footprint,
+        contourSource: 'osm',
+      };
+    });
+
+    mockProperties.value = updatedProperties;
+
+    const cachePayload = updatedProperties
+      .filter((property) => property.contourSource === 'osm')
+      .reduce((accumulator, property) => {
+        accumulator[property.id] = property.footprint;
+        return accumulator;
+      }, {});
+
+    if (Object.keys(cachePayload).length) {
+      setContoursCache(cachePayload);
+    }
+
+    if (!updatedProperties.some((property) => property.contourSource === 'osm')) {
+      contourLoadError.value =
+        'Не удалось загрузить реальные контуры, используем fallback-полигоны.';
+    }
+  } catch {
+    contourLoadError.value = 'Ошибка при загрузке контуров зданий. Используются fallback-полигоны.';
+  } finally {
+    isContoursLoading.value = false;
+  }
+}
+
+async function fetchBuildingsInArea(centers) {
+  const bbox = getCentersBoundingBox(centers, 0.005);
+  const query = `
+    [out:json][timeout:25];
+    way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+    out geom;
+  `;
+
+  return requestOverpassWays(query);
+}
+
+async function requestOverpassWays(query) {
+  for (const endpoint of overpassEndpoints) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          },
+          body: `data=${encodeURIComponent(query)}`,
+        });
+
+        if (response.status === 429) {
+          await sleep(1200 * (attempt + 1));
+          continue;
+        }
+
+        if (!response.ok) {
+          break;
+        }
+
+        const data = await response.json();
+        const ways = data?.elements?.filter(
+          (element) =>
+            element.type === 'way' &&
+            Array.isArray(element.geometry) &&
+            element.geometry.length >= 4
+        );
+
+        if (Array.isArray(ways)) {
+          return ways;
+        }
+      } catch {
+        await sleep(400 * (attempt + 1));
+      }
+    }
+  }
+
+  return [];
+}
+
+function findNearestWayForCenter(ways, center) {
+  if (!Array.isArray(ways) || !ways.length) {
+    return null;
+  }
+
+  const containingWay = ways.find((way) => {
+    const ring = geometryToRing(way.geometry);
+    if (!ring) {
+      return false;
+    }
+
+    return isPointInsidePolygon(center, ring);
+  });
+
+  if (containingWay) {
+    return containingWay;
+  }
+
+  return ways.reduce((closest, current) => {
+    const closestDistance = getDistanceToCenter(center, closest.geometry);
+    const currentDistance = getDistanceToCenter(center, current.geometry);
+    return currentDistance < closestDistance ? current : closest;
+  }, ways[0]);
+}
+
+function geometryToRing(geometry) {
+  const ring = geometry.map((point) => [point.lon, point.lat]);
+  if (!ring.length) {
+    return null;
+  }
+
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring.push(first);
+  }
+
+  return ring;
+}
+
+function getCentersBoundingBox(centers, padding = 0.003) {
+  const lngs = centers.map(([lng]) => lng);
+  const lats = centers.map(([, lat]) => lat);
+
+  return {
+    west: Math.min(...lngs) - padding,
+    south: Math.min(...lats) - padding,
+    east: Math.max(...lngs) + padding,
+    north: Math.max(...lats) + padding,
+  };
+}
+
+function getContoursCache() {
+  try {
+    const raw = sessionStorage.getItem(contoursCacheKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function setContoursCache(cacheValue) {
+  try {
+    sessionStorage.setItem(contoursCacheKey, JSON.stringify(cacheValue));
+  } catch {
+    return;
+  }
+}
+
+function getCentersCache() {
+  try {
+    const raw = sessionStorage.getItem(centersCacheKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCentersCache(cacheValue) {
+  try {
+    sessionStorage.setItem(centersCacheKey, JSON.stringify(cacheValue));
+  } catch {
+    return;
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function getDistanceToCenter(center, geometry) {
+  const [centerLng, centerLat] = center;
+  const centroid = geometry.reduce(
+    (accumulator, point) => {
+      return [accumulator[0] + point.lon, accumulator[1] + point.lat];
+    },
+    [0, 0]
+  );
+
+  const avgLng = centroid[0] / geometry.length;
+  const avgLat = centroid[1] / geometry.length;
+
+  const deltaLng = avgLng - centerLng;
+  const deltaLat = avgLat - centerLat;
+
+  return deltaLng ** 2 + deltaLat ** 2;
+}
 
 function startDrawing() {
   isDrawing.value = true;
@@ -584,6 +986,10 @@ h1 {
 
 .panel p {
   margin: 0 0 8px;
+}
+
+.panel__error {
+  color: #b71c1c;
 }
 
 .properties-list {
