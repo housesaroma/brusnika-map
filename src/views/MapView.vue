@@ -51,6 +51,13 @@
                 <span>Зум: <b>{{ currentZoom }}</b></span>
               </Tag>
             </div>
+
+            <!-- Дровер с информацией об объекте -->
+            <PropertyDrawer
+              :is-open="isDrawerOpen"
+              :property="selectedProperty"
+              @close="closeDrawer"
+            />
           </template>
 
           <div v-else class="no-api-key">
@@ -83,15 +90,22 @@ import Tag from 'primevue/tag';
 import { usePropertiesStore } from '@/stores/properties';
 import PropertyMarkers from '@/components/map/PropertyMarkers.vue';
 import DistrictsLayer from '@/components/map/DistrictsLayer.vue';
+import PropertyDrawer from '@/components/panels/Drawer.vue';
 
 const map = ref(null);
 const selectedPropertyId = ref(null);
+const selectedProperty = ref(null);
+const isDrawerOpen = ref(false);
 const currentZoom = ref(11);
 
 const listenerSettings = {
   onUpdate: (e) => {
     if (e?.location?.zoom) {
-      currentZoom.value = Math.round(e.location.zoom * 10) / 10;
+      // Округляем зум до целого для уменьшения частоты обновлений
+      const newZoom = Math.round(e.location.zoom);
+      if (newZoom !== currentZoom.value) {
+        currentZoom.value = newZoom;
+      }
     }
   },
 };
@@ -120,7 +134,15 @@ onMounted(() => {
 
 function handlePropertyClick(property) {
   selectedPropertyId.value = property.id;
+  selectedProperty.value = property;
+  isDrawerOpen.value = true;
   console.log('Property clicked:', property);
+}
+
+function closeDrawer() {
+  isDrawerOpen.value = false;
+  selectedProperty.value = null;
+  selectedPropertyId.value = null;
 }
 </script>
 

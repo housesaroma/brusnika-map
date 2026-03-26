@@ -11,14 +11,16 @@
     >
       {{ marker.count }}
     </div>
-    <div
+    <PropertyMarker
       v-else
-      class="property-marker"
-      :class="{ 'property-marker--selected': selectedPropertyId === marker.propertyId }"
+      :id="String(marker.propertyId)"
+      :coordinates="marker.center"
+      :label="marker.formattedPrice"
+      kind="property"
+      :is-selected="selectedPropertyId === marker.propertyId"
+      :tooltip-data="marker.tooltipData"
       @click="handlePropertyClick(marker.property)"
-    >
-      <span class="property-marker__price">{{ formatPrice(marker.price) }}</span>
-    </div>
+    />
   </YandexMapMarker>
 </template>
 
@@ -27,6 +29,7 @@ import { computed } from 'vue';
 import { YandexMapMarker } from 'vue-yandex-maps';
 import { useFormatters } from '@/composables/useFormatters';
 import { useMarkerClustering } from '@/composables/useMarkerClustering';
+import PropertyMarker from './PropertyMarker.vue';
 
 const props = defineProps({
   properties: {
@@ -52,7 +55,24 @@ const { groupMarkers, getClusterSize } = useMarkerClustering();
 // Пересчитываем при изменении зума или свойств
 const visibleMarkers = computed(() => {
   const clusterSize = getClusterSize(props.zoom);
-  return groupMarkers(props.properties, clusterSize);
+  const markers = groupMarkers(props.properties, clusterSize);
+
+  // Добавляем отформатированные данные для каждого маркера
+  return markers.map((marker) => {
+    if (marker.type === 'property') {
+      return {
+        ...marker,
+        formattedPrice: formatPrice(marker.price),
+        tooltipData: {
+          address: marker.property.address || '',
+          meta: `${marker.property.area} м² • ${marker.property.rooms} комн. • ${formatPrice(marker.price)}`,
+          imageUrl: marker.property.planUrl || '',
+          alt: marker.property.name || marker.property.address,
+        },
+      };
+    }
+    return marker;
+  });
 });
 
 function handleClusterClick(cluster) {
@@ -66,32 +86,6 @@ function handlePropertyClick(property) {
 </script>
 
 <style>
-.property-marker {
-  position: relative;
-  transform: translate(-50%, -100%);
-  background: #ffffff;
-  border: 1px solid #d94444;
-  border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  padding: 4px 8px;
-  cursor: pointer;
-  min-width: 78px;
-  text-align: center;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.property-marker--selected {
-  border-color: #f57c00;
-  box-shadow: 0 4px 14px rgba(245, 124, 0, 0.35);
-}
-
-.property-marker__price {
-  font-size: 11px;
-  font-weight: 700;
-  color: #2d2d2d;
-}
-
 .cluster-marker {
   width: 40px;
   height: 40px;

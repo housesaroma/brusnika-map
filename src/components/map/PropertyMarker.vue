@@ -9,7 +9,7 @@
     >
       <span class="property-marker__label">{{ label }}</span>
 
-      <article v-if="showTooltip && tooltipData" class="marker-tooltip">
+      <article v-if="isHovered && tooltipData" class="marker-tooltip">
         <p class="marker-tooltip__address">{{ tooltipData.address }}</p>
         <p class="marker-tooltip__meta">{{ tooltipData.meta }}</p>
         <img
@@ -56,10 +56,6 @@ const props = defineProps({
   tooltipData: {
     type: Object,
     default: null,
-  },
-  showTooltip: {
-    type: Boolean,
-    default: false,
   },
 });
 

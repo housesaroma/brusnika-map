@@ -32,9 +32,36 @@ export function useFormatters() {
     return num.toLocaleString('ru-RU');
   }
 
+  /**
+   * Форматирует тип сделки
+   */
+  function formatDealType(type) {
+    const types = {
+      sale: 'Продажа',
+      rent: 'Аренда',
+    };
+    return types[type] || type || '—';
+  }
+
+  /**
+   * Форматирует тип объекта
+   */
+  function formatPropertyType(type) {
+    const types = {
+      flat: 'Квартира',
+      layout: 'Европланировка',
+      house: 'Дом',
+      land: 'Участок',
+      commercial: 'Коммерческое',
+    };
+    return types[type] || type || '—';
+  }
+
   return {
     formatPrice,
     formatArea,
     formatNumber,
+    formatDealType,
+    formatPropertyType,
   };
 }
