@@ -53,6 +53,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isInDistrict: {
+    type: Boolean,
+    default: true,
+  },
   tooltipData: {
     type: Object,
     default: null,
@@ -68,6 +72,7 @@ const markerClasses = computed(() => ({
   'property-marker--inside': props.isInZone,
   'property-marker--count': props.kind !== 'property',
   'property-marker--cluster': props.kind === 'cluster',
+  'property-marker--outside-district': !props.isInDistrict,
 }));
 
 function handleMouseEnter() {
@@ -102,6 +107,10 @@ function handleClick() {
 
 .property-marker--inside {
   border-color: #2e7d32;
+}
+
+.property-marker--outside-district {
+  opacity: 0.2;
 }
 
 .property-marker--selected {

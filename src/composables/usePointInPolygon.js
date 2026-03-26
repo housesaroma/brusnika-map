@@ -67,9 +67,43 @@ export function usePointInPolygon() {
     return items.filter((item) => isPointInside(item.center, polygon));
   }
 
+  /**
+   * Проверяет попадание точки в район из GeoJSON
+   * Поддерживает Polygon и MultiPolygon геометрии
+   * @param {Array<number>} point - Координаты точки [lng, lat]
+   * @param {Object} feature - GeoJSON Feature
+   * @returns {boolean}
+   */
+  function isPointInDistrict(point, feature) {
+    if (!feature?.geometry) return false;
+
+    const { type, coordinates } = feature.geometry;
+
+    if (type === 'Polygon') {
+      // Проверяем каждый полигон (внешний контур и возможные дыры)
+      for (const polygon of coordinates) {
+        if (isPointInside(point, polygon)) {
+          return true;
+        }
+      }
+    } else if (type === 'MultiPolygon') {
+      // Для MultiPolygon проверяем все полигоны
+      for (const polygonGroup of coordinates) {
+        for (const polygon of polygonGroup) {
+          if (isPointInside(point, polygon)) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   return {
     isPointInside,
     isPointOnSegment,
     filterItemsInside,
+    isPointInDistrict,
   };
 }

@@ -8,7 +8,8 @@
 
 <script setup>
 import { YandexMapFeature } from 'vue-yandex-maps';
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useDistrictsStore } from '@/stores/districts';
 
 const props = defineProps({
   fillColor: {
@@ -25,6 +26,7 @@ const props = defineProps({
   },
 });
 
+const districtsStore = useDistrictsStore();
 const districtsData = ref(null);
 const loading = ref(false);
 const error = ref('');
@@ -54,12 +56,26 @@ async function loadDistricts() {
 const districtsFeatures = computed(() => {
   if (!districtsData.value) return [];
 
-  return districtsData.value.features.map((feature) => ({
-    geometry: feature.geometry,
-    style: {
-      fill: props.fillColor,
-      stroke: [{ color: props.strokeColor, width: props.strokeWidth }],
-    },
-  }));
+  const selectedName = districtsStore.selectedDistrict?.name;
+
+  return districtsData.value.features.map((feature) => {
+    const districtName = feature.properties?.name;
+    const isSelected = selectedName && districtName === selectedName;
+
+    return {
+      geometry: feature.geometry,
+      style: {
+        fill: isSelected
+          ? 'rgba(245, 124, 0, 0.4)' // Оранжевый с прозрачностью 40%
+          : props.fillColor,
+        stroke: [
+          {
+            color: isSelected ? '#f57c00' : props.strokeColor,
+            width: isSelected ? 3 : props.strokeWidth,
+          },
+        ],
+      },
+    };
+  });
 });
 </script>

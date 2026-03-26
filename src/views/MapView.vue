@@ -9,65 +9,74 @@
           </div>
         </template>
         <template #content>
-          <div v-if="loading" class="loading-container">
-            <ProgressSpinner style="width: 50px; height: 50px" />
-            <p class="text-gray-500 mt-4">Загрузка объектов...</p>
-          </div>
+          <div class="map-content">
+            <!-- Левая панель с районами -->
+            <aside class="map-sidebar">
+              <DistrictsPanel @district-click="handleDistrictClick" />
+            </aside>
 
-          <div v-else-if="error" class="error-container">
-            <Message severity="error" :closable="false">
-              {{ error }}
-            </Message>
-          </div>
+            <div class="map-wrapper">
+              <div v-if="loading" class="loading-container">
+                <ProgressSpinner style="width: 50px; height: 50px" />
+                <p class="text-gray-500 mt-4">Загрузка объектов...</p>
+              </div>
 
-          <template v-else-if="hasApiKey">
-            <YandexMap
-              v-model="map"
-              :settings="mapSettings"
-              width="100%"
-              height="600px"
-            >
-              <YandexMapDefaultSchemeLayer />
-              <YandexMapDefaultFeaturesLayer />
-              <YandexMapListener :settings="listenerSettings" />
+              <div v-else-if="error" class="error-container">
+                <Message severity="error" :closable="false">
+                  {{ error }}
+                </Message>
+              </div>
 
-              <!-- Слой с районами -->
-              <DistrictsLayer />
+              <template v-else-if="hasApiKey">
+                <YandexMap
+                  v-model="map"
+                  :settings="mapSettings"
+                  width="100%"
+                  height="600px"
+                >
+                  <YandexMapDefaultSchemeLayer />
+                  <YandexMapDefaultFeaturesLayer />
+                  <YandexMapListener :settings="listenerSettings" />
 
-              <!-- Маркеры объектов с кластеризацией -->
-              <PropertyMarkers
-                :properties="propertiesWithCoords"
-                :selected-property-id="selectedPropertyId"
-                :zoom="currentZoom"
-                @property-click="handlePropertyClick"
-              />
-            </YandexMap>
+                  <!-- Слой с районами -->
+                  <DistrictsLayer />
 
-            <div class="map-info mt-4">
-              <Tag severity="info">
-                <span>Всего объектов: <b>{{ propertiesWithCoords.length }}</b></span>
-              </Tag>
-              <Tag severity="secondary" class="ml-2">
-                <span>Зум: <b>{{ currentZoom }}</b></span>
-              </Tag>
+                  <!-- Маркеры объектов с кластеризацией -->
+                  <PropertyMarkers
+                    :properties="propertiesWithCoords"
+                    :selected-property-id="selectedPropertyId"
+                    :zoom="currentZoom"
+                    @property-click="handlePropertyClick"
+                  />
+                </YandexMap>
+
+                <div class="map-info mt-4">
+                  <Tag severity="info">
+                    <span>Всего объектов: <b>{{ propertiesWithCoords.length }}</b></span>
+                  </Tag>
+                  <Tag severity="secondary" class="ml-2">
+                    <span>Зум: <b>{{ currentZoom }}</b></span>
+                  </Tag>
+                </div>
+
+                <!-- Дровер с информацией об объекте -->
+                <PropertyDrawer
+                  :is-open="isDrawerOpen"
+                  :property="selectedProperty"
+                  @close="closeDrawer"
+                />
+              </template>
+
+              <div v-else class="no-api-key">
+                <i class="pi pi-exclamation-triangle text-3xl text-yellow-500 mb-3"></i>
+                <p class="text-gray-700 font-medium mb-2">API ключ Яндекс Карт не задан</p>
+                <p class="text-sm text-gray-500">
+                  Укажите
+                  <code class="bg-gray-100 px-2 py-1 rounded">VITE_YANDEX_MAPS_API_KEY</code> в
+                  <code class="bg-gray-100 px-2 py-1 rounded">.env.local</code>
+                </p>
+              </div>
             </div>
-
-            <!-- Дровер с информацией об объекте -->
-            <PropertyDrawer
-              :is-open="isDrawerOpen"
-              :property="selectedProperty"
-              @close="closeDrawer"
-            />
-          </template>
-
-          <div v-else class="no-api-key">
-            <i class="pi pi-exclamation-triangle text-3xl text-yellow-500 mb-3"></i>
-            <p class="text-gray-700 font-medium mb-2">API ключ Яндекс Карт не задан</p>
-            <p class="text-sm text-gray-500">
-              Укажите
-              <code class="bg-gray-100 px-2 py-1 rounded">VITE_YANDEX_MAPS_API_KEY</code> в
-              <code class="bg-gray-100 px-2 py-1 rounded">.env.local</code>
-            </p>
           </div>
         </template>
       </Card>
@@ -91,6 +100,7 @@ import { usePropertiesStore } from '@/stores/properties';
 import PropertyMarkers from '@/components/map/PropertyMarkers.vue';
 import DistrictsLayer from '@/components/map/DistrictsLayer.vue';
 import PropertyDrawer from '@/components/panels/Drawer.vue';
+import DistrictsPanel from '@/components/panels/DistrictsPanel.vue';
 
 const map = ref(null);
 const selectedPropertyId = ref(null);
@@ -143,6 +153,12 @@ function closeDrawer() {
   isDrawerOpen.value = false;
   selectedProperty.value = null;
   selectedPropertyId.value = null;
+}
+
+function handleDistrictClick(district) {
+  console.log('District clicked:', district);
+  // Здесь можно добавить логику фильтрации объектов по району
+  // или подсветку выбранного района на карте
 }
 </script>
 
@@ -205,5 +221,24 @@ function closeDrawer() {
 
 .ml-2 {
   margin-left: 0.5rem;
+}
+
+.map-content {
+  display: flex;
+  gap: 1rem;
+  height: 600px;
+}
+
+.map-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--p-surface-0);
+  border-radius: var(--p-card-border-radius);
+  overflow: hidden;
+}
+
+.map-wrapper {
+  flex: 1;
+  min-width: 0;
 }
 </style>
