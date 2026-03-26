@@ -31,6 +31,9 @@
               <YandexMapDefaultFeaturesLayer />
               <YandexMapListener :settings="listenerSettings" />
 
+              <!-- Слой с районами -->
+              <DistrictsLayer />
+
               <!-- Маркеры объектов с кластеризацией -->
               <PropertyMarkers
                 :properties="propertiesWithCoords"
@@ -79,6 +82,7 @@ import Message from 'primevue/message';
 import Tag from 'primevue/tag';
 import { usePropertiesStore } from '@/stores/properties';
 import PropertyMarkers from '@/components/map/PropertyMarkers.vue';
+import DistrictsLayer from '@/components/map/DistrictsLayer.vue';
 
 const map = ref(null);
 const selectedPropertyId = ref(null);
