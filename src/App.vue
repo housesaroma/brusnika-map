@@ -1,28 +1,44 @@
 <template>
   <div class="app">
-    <header class="app-header">
-      <router-link to="/" class="app-header__logo">Brusnika Map</router-link>
-      <nav class="app-header__nav">
-        <router-link to="/map" class="app-header__link">Карта</router-link>
-        <router-link to="/properties" class="app-header__link">Объекты</router-link>
-      </nav>
-    </header>
+    <Menubar class="app-header" :model="menuItems">
+      <template #start>
+        <router-link to="/" class="app-header__logo">
+          <i class="pi pi-map mr-2"></i>
+          Brusnika Map
+        </router-link>
+      </template>
+    </Menubar>
 
     <main class="app-main">
       <router-view />
     </main>
 
     <footer class="app-footer">
-      <p>&copy; 2026 Brusnika. Инструмент оценки недвижимости.</p>
+      <div class="container">
+        <p class="text-sm text-gray-600">&copy; 2026 Brusnika. Инструмент оценки недвижимости.</p>
+      </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-// Main app layout - router outlet container
+import Menubar from 'primevue/menubar';
+
+const menuItems = [
+  {
+    label: 'Карта',
+    icon: 'pi pi-map',
+    to: '/map',
+  },
+  {
+    label: 'Объекты',
+    icon: 'pi pi-building',
+    to: '/properties',
+  },
+];
 </script>
 
-<style scoped>
+<style>
 .app {
   min-height: 100vh;
   display: flex;
@@ -30,60 +46,38 @@
 }
 
 .app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #fff;
+  border-radius: 0;
+  padding: 0 1rem;
 }
 
 .app-header__logo {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1565c0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: var(--p-primary-color);
   text-decoration: none;
 }
 
 .app-header__logo:hover {
-  color: #0d47a1;
-}
-
-.app-header__nav {
-  display: flex;
-  gap: 24px;
-}
-
-.app-header__link {
-  color: #333;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s;
-}
-
-.app-header__link:hover {
-  color: #1565c0;
-}
-
-.app-header__link.router-link-active {
-  color: #1565c0;
+  color: var(--p-primary-hover-color);
 }
 
 .app-main {
   flex: 1;
-  background: #f5f5f5;
+  background: var(--p-surface-100);
 }
 
 .app-footer {
-  padding: 16px 24px;
-  border-top: 1px solid #e0e0e0;
-  background: #fff;
-  text-align: center;
+  border-top: 1px solid var(--p-surface-200);
+  background: var(--p-surface-0);
+  padding: 1rem 0;
 }
 
-.app-footer p {
-  margin: 0;
-  font-size: 14px;
-  color: #666;
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1rem;
 }
 </style>

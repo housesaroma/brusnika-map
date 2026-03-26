@@ -6,15 +6,15 @@
 
 ### Stack
 
-| Категория       | Технологии                          |
-|-----------------|-------------------------------------|
-| Framework       | Vue 3 (Composition API, `<script setup>`) |
-| Build Tool      | Vite 8                              |
-| Maps            | Yandex Maps API v3 (`vue-yandex-maps`) |
-| State Management| Pinia                               |
-| Routing         | Vue Router 5                        |
-| HTTP Client     | Axios                               |
-| Linting         | ESLint 9 + Prettier                 |
+| Категория        | Технологии                                |
+| ---------------- | ----------------------------------------- |
+| Framework        | Vue 3 (Composition API, `<script setup>`) |
+| Build Tool       | Vite 8                                    |
+| Maps             | Yandex Maps API v3 (`vue-yandex-maps`)    |
+| State Management | Pinia                                     |
+| Routing          | Vue Router 5                              |
+| HTTP Client      | Axios                                     |
+| Linting          | ESLint 9 + Prettier                       |
 
 ### Architecture
 
@@ -83,16 +83,16 @@ cp .env.example .env.local
 
 ### Commands
 
-| Command              | Description                    |
-|----------------------|--------------------------------|
-| `npm run dev`        | Запуск dev-сервера             |
-| `npm run build`      | Сборка production-версии       |
-| `npm run preview`    | Preview production-сборки      |
-| `npm run lint`       | Проверка ESLint                |
-| `npm run lint:fix`   | Исправление ESLint ошибок      |
-| `npm run format`     | Форматирование Prettier        |
-| `npm run format:check` | Проверка форматирования      |
-| `npm run fix:all`    | Lint + Format (перед коммитом) |
+| Command                | Description                    |
+| ---------------------- | ------------------------------ |
+| `npm run dev`          | Запуск dev-сервера             |
+| `npm run build`        | Сборка production-версии       |
+| `npm run preview`      | Preview production-сборки      |
+| `npm run lint`         | Проверка ESLint                |
+| `npm run lint:fix`     | Исправление ESLint ошибок      |
+| `npm run format`       | Форматирование Prettier        |
+| `npm run format:check` | Проверка форматирования        |
+| `npm run fix:all`      | Lint + Format (перед коммитом) |
 
 ### Verification Workflow
 
@@ -118,12 +118,12 @@ npm run build
 
 ### Naming Conventions
 
-| Тип           | Стиль          | Пример                      |
-|---------------|----------------|-----------------------------|
-| Components    | PascalCase     | `PropertyMarker.vue`        |
-| Composables   | camelCase + use| `usePolygonDrawing.js`      |
-| Stores        | camelCase      | `properties.js`, `polygons.js` |
-| Utils         | camelCase      | `geo.js`, `formatters.js`   |
+| Тип         | Стиль           | Пример                         |
+| ----------- | --------------- | ------------------------------ |
+| Components  | PascalCase      | `PropertyMarker.vue`           |
+| Composables | camelCase + use | `usePolygonDrawing.js`         |
+| Stores      | camelCase       | `properties.js`, `polygons.js` |
+| Utils       | camelCase       | `geo.js`, `formatters.js`      |
 
 ### Component Guidelines
 

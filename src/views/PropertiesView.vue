@@ -1,43 +1,57 @@
 <template>
   <div class="properties-view">
-    <h1>Объекты недвижимости</h1>
-    <p class="subtitle">Список всех доступных объектов</p>
-
-    <div class="properties-list">
-      <p class="placeholder">Список объектов будет загружен из API</p>
+    <div class="container">
+      <Card>
+        <template #header>
+          <div class="properties-header">
+            <h1 class="page-title">Объекты недвижимости</h1>
+            <p class="page-subtitle">Список всех доступных объектов</p>
+          </div>
+        </template>
+        <template #content>
+          <div class="properties-placeholder">
+            <i class="pi pi-building text-6xl text-gray-400 mb-4"></i>
+            <p class="text-gray-500">Список объектов будет загружен из API</p>
+          </div>
+        </template>
+      </Card>
     </div>
   </div>
 </template>
 
 <script setup>
-// Properties view - list of all properties
+import Card from 'primevue/card';
 </script>
 
-<style scoped>
+<style>
 .properties-view {
-  padding: 24px;
+  padding: 2rem;
 }
 
-h1 {
-  font-size: 24px;
-  margin: 0 0 8px;
+.properties-header {
+  padding: 1.5rem;
 }
 
-.subtitle {
-  color: #666;
-  margin: 0 0 24px;
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--p-text-color);
 }
 
-.properties-list {
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  padding: 24px;
+.page-subtitle {
+  margin: 0;
+  color: var(--p-text-muted-color);
+}
+
+.properties-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   min-height: 400px;
-  background: #fafafa;
-}
-
-.placeholder {
-  color: #999;
-  text-align: center;
+  background: var(--p-surface-50);
+  border: 2px dashed var(--p-surface-200);
+  border-radius: var(--p-card-border-radius);
 }
 </style>

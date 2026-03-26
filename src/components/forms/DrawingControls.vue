@@ -1,34 +1,35 @@
 <template>
-  <div class="drawing-controls">
-    <button
+  <div class="drawing-controls flex items-center gap-2 flex-wrap">
+    <Button
       v-if="!isDrawing"
-      type="button"
-      class="btn btn--primary"
+      label="Начать рисование"
+      icon="pi pi-pencil"
       :disabled="disabled"
       @click="handleStart"
-    >
-      Начать рисование
-    </button>
+    />
 
     <template v-else>
-      <button type="button" class="btn btn--success" :disabled="!canFinish" @click="handleFinish">
-        Завершить полигон
-      </button>
-
-      <button type="button" class="btn btn--secondary" @click="handleCancel">Отмена</button>
+      <Button
+        label="Завершить полигон"
+        icon="pi pi-check"
+        severity="success"
+        :disabled="!canFinish"
+        @click="handleFinish"
+      />
+      <Button label="Отмена" icon="pi pi-times" severity="secondary" @click="handleCancel" />
     </template>
 
-    <button
+    <Button
       v-if="hasPolygon"
-      type="button"
-      class="btn btn--danger"
+      label="Очистить геозону"
+      icon="pi pi-trash"
+      severity="danger"
+      outlined
       :disabled="disabled"
       @click="handleClear"
-    >
-      Очистить геозону
-    </button>
+    />
 
-    <span v-if="statusText" class="status" :class="{ 'status--drawing': isDrawing }">
+    <span v-if="statusText" class="status-text" :class="{ 'status-text--drawing': isDrawing }">
       {{ statusText }}
     </span>
   </div>
@@ -77,75 +78,21 @@ function handleClear() {
 }
 </script>
 
-<style scoped>
+<style>
 .drawing-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
-.btn {
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
+.status-text {
+  font-size: 0.875rem;
+  color: var(--p-text-muted-color);
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--primary {
-  background: #1565c0;
-  color: #fff;
-  border-color: #1565c0;
-}
-
-.btn--primary:hover:not(:disabled) {
-  background: #0d47a1;
-}
-
-.btn--secondary {
-  background: #fff;
-  color: #333;
-  border-color: #cbcbcb;
-}
-
-.btn--secondary:hover:not(:disabled) {
-  background: #f5f5f5;
-}
-
-.btn--success {
-  background: #2e7d32;
-  color: #fff;
-  border-color: #2e7d32;
-}
-
-.btn--success:hover:not(:disabled) {
-  background: #1b5e20;
-}
-
-.btn--danger {
-  background: #fff;
-  color: #d32f2f;
-  border-color: #d32f2f;
-}
-
-.btn--danger:hover:not(:disabled) {
-  background: #ffebee;
-}
-
-.status {
-  font-size: 14px;
-  color: #666;
-}
-
-.status--drawing {
-  color: #1565c0;
+.status-text--drawing {
+  color: var(--p-primary-color);
   font-weight: 600;
 }
 </style>

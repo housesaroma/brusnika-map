@@ -1,127 +1,68 @@
 <template>
   <div class="brusnika-map">
-    <yandex-map
-      v-if="hasApiKey"
-      ref="mapRef"
-      v-model="map"
-      :settings="mapSettings"
-      width="100%"
-      height="100%"
-    >
-      <yandex-map-default-scheme-layer />
-      <yandex-map-default-features-layer />
+    <Card v-if="!hasApiKey">
+      <template #content>
+        <div class="no-api-key">
+          <i class="pi pi-exclamation-triangle text-3xl text-yellow-500 mb-3"></i>
+          <p class="text-gray-700 font-medium mb-2">API ключ Яндекс Карт не задан</p>
+          <p class="text-sm text-gray-500">
+            Укажите <code class="bg-gray-100 px-2 py-1 rounded">VITE_YANDEX_MAPS_API_KEY</code> в
+            <code class="bg-gray-100 px-2 py-1 rounded">.env.local</code>
+          </p>
+        </div>
+      </template>
+    </Card>
 
-      <yandex-map-listener :settings="listenerSettings" />
-
-      <slot name="features" />
-      <slot name="markers" />
-    </yandex-map>
-
-    <div v-else class="no-api-key">
-      <p>API ключ Яндекс Карт не задан</p>
-      <p class="hint">Укажите <code>VITE_YANDEX_MAPS_API_KEY</code> в <code>.env.local</code></p>
-    </div>
+    <div v-else ref="mapContainer" class="map-container"></div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, shallowRef } from 'vue';
-import {
-  YandexMap,
-  YandexMapDefaultSchemeLayer,
-  YandexMapDefaultFeaturesLayer,
-  YandexMapListener,
-} from 'vue-yandex-maps';
+import { ref, onMounted } from 'vue';
+import Card from 'primevue/card';
 
-const props = defineProps({
-  center: {
-    type: Array,
-    default: () => [60.597465, 56.838011],
-  },
-  zoom: {
-    type: Number,
-    default: 11,
-  },
-  onClick: {
-    type: Function,
-    default: () => {},
-  },
-});
-
-const emit = defineEmits(['map-ready', 'zoom-change']);
-
-const mapRef = ref(null);
-const map = shallowRef(null);
+const mapContainer = ref(null);
 const yandexMapsApiKey = import.meta.env.VITE_YANDEX_MAPS_API_KEY || '';
 const hasApiKey = Boolean(yandexMapsApiKey);
 
-const mapSettings = computed(() => ({
-  location: {
-    center: props.center,
-    zoom: props.zoom,
-  },
-}));
+onMounted(() => {
+  if (hasApiKey && mapContainer.value) {
+    initMap();
+  }
+});
 
-const listenerSettings = {
-  onUpdate: (event) => {
-    if (event?.location?.zoom) {
-      emit('zoom-change', event.location.zoom);
-    }
-  },
-  onClick: (_, mapEvent) => {
-    const coordinates =
-      mapEvent?.coordinates ||
-      mapEvent?.lngLat ||
-      mapEvent?.coordPosition ||
-      mapEvent?.location?.center ||
-      null;
-
-    if (!Array.isArray(coordinates) || coordinates.length !== 2) {
-      return;
-    }
-
-    props.onClick(coordinates);
-  },
-};
-
-function getMapInstance() {
-  return map.value;
+function initMap() {
+  // Инициализация карты будет реализована позже
+  // Пока заглушка для будущего функционала
 }
-
-defineExpose({ getMapInstance });
 </script>
 
-<style scoped>
+<style>
 .brusnika-map {
   width: 100%;
   height: 100%;
-  min-height: 400px;
-  border-radius: 12px;
+  min-height: 500px;
+}
+
+.map-container {
+  width: 100%;
+  height: 600px;
+  border-radius: var(--p-card-border-radius);
   overflow: hidden;
+  border: 1px solid var(--p-surface-200);
 }
 
 .no-api-key {
-  width: 100%;
-  height: 100%;
-  min-height: 400px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px dashed #ccc;
-  border-radius: 12px;
-  background: #fafafa;
-  color: #666;
+  padding: 3rem;
+  text-align: center;
 }
 
-.hint {
-  font-size: 13px;
-  color: #999;
-}
-
-.hint code {
-  background: #f0f0f0;
-  padding: 2px 6px;
-  border-radius: 4px;
+.no-api-key code {
+  font-family: monospace;
+  font-size: 0.875rem;
 }
 </style>

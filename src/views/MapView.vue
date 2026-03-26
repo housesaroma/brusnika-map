@@ -1,44 +1,57 @@
 <template>
   <div class="map-view">
-    <h1>Карта объектов</h1>
-    <p class="subtitle">Визуализация недвижимости на карте Екатеринбурга</p>
-
-    <div class="map-container">
-      <p class="placeholder">Здесь будет карта с объектами</p>
+    <div class="container">
+      <Card>
+        <template #header>
+          <div class="map-header">
+            <h1 class="page-title">Карта объектов</h1>
+            <p class="page-subtitle">Визуализация недвижимости на карте Екатеринбурга</p>
+          </div>
+        </template>
+        <template #content>
+          <div class="map-placeholder">
+            <i class="pi pi-map text-6xl text-gray-400 mb-4"></i>
+            <p class="text-gray-500">Здесь будет карта с объектами</p>
+          </div>
+        </template>
+      </Card>
     </div>
   </div>
 </template>
 
 <script setup>
-// Map view - main map with properties
+import Card from 'primevue/card';
 </script>
 
-<style scoped>
+<style>
 .map-view {
-  padding: 24px;
+  padding: 2rem;
 }
 
-h1 {
-  font-size: 24px;
-  margin: 0 0 8px;
+.map-header {
+  padding: 1.5rem;
 }
 
-.subtitle {
-  color: #666;
-  margin: 0 0 24px;
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--p-text-color);
 }
 
-.map-container {
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  height: 600px;
+.page-subtitle {
+  margin: 0;
+  color: var(--p-text-muted-color);
+}
+
+.map-placeholder {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #fafafa;
-}
-
-.placeholder {
-  color: #999;
+  min-height: 500px;
+  background: var(--p-surface-50);
+  border: 2px dashed var(--p-surface-200);
+  border-radius: var(--p-card-border-radius);
 }
 </style>

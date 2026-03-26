@@ -1,65 +1,77 @@
 <template>
   <div class="home-view">
-    <h1>Brusnika Map</h1>
-    <p class="subtitle">Инструмент для оценки рыночной стоимости недвижимости</p>
+    <div class="container">
+      <Card class="welcome-card">
+        <template #content>
+          <div class="welcome-content">
+            <h1 class="welcome-title">Brusnika Map</h1>
+            <p class="welcome-subtitle">
+              Инструмент для оценки рыночной стоимости недвижимости с визуализацией на карте
+            </p>
 
-    <div class="actions">
-      <router-link to="/map" class="btn btn--primary">Открыть карту</router-link>
-      <router-link to="/properties" class="btn btn--secondary">Объекты</router-link>
+            <div class="welcome-actions">
+              <Button
+                label="Открыть карту"
+                icon="pi pi-map"
+                size="large"
+                @click="$router.push('/map')"
+              />
+              <Button
+                label="Объекты"
+                icon="pi pi-building"
+                size="large"
+                severity="secondary"
+                @click="$router.push('/properties')"
+              />
+            </div>
+          </div>
+        </template>
+      </Card>
     </div>
   </div>
 </template>
 
 <script setup>
-// Home view - landing page
+import Card from 'primevue/card';
+import Button from 'primevue/button';
 </script>
 
-<style scoped>
+<style>
 .home-view {
-  text-align: center;
-  padding: 48px 24px;
-}
-
-h1 {
-  font-size: 32px;
-  margin: 0 0 8px;
-}
-
-.subtitle {
-  color: #666;
-  margin: 0 0 32px;
-}
-
-.actions {
   display: flex;
-  gap: 16px;
+  align-items: center;
   justify-content: center;
+  min-height: calc(100vh - 140px);
+  padding: 2rem;
 }
 
-.btn {
-  padding: 12px 24px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: 600;
-  transition: all 0.2s;
+.welcome-card {
+  width: 100%;
+  max-width: 600px;
 }
 
-.btn--primary {
-  background: #1565c0;
-  color: #fff;
+.welcome-content {
+  text-align: center;
+  padding: 2rem 1rem;
 }
 
-.btn--primary:hover {
-  background: #0d47a1;
+.welcome-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+  color: var(--p-text-color);
 }
 
-.btn--secondary {
-  background: #f5f5f5;
-  color: #333;
-  border: 1px solid #ddd;
+.welcome-subtitle {
+  font-size: 1.125rem;
+  color: var(--p-text-muted-color);
+  margin: 0 0 2rem;
 }
 
-.btn--secondary:hover {
-  background: #e0e0e0;
+.welcome-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 </style>
