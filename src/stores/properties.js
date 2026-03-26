@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { propertiesApi } from '@/api/properties';
 
 export const usePropertiesStore = defineStore('properties', () => {
   const items = ref([]);
@@ -38,9 +39,9 @@ export const usePropertiesStore = defineStore('properties', () => {
     error.value = '';
 
     try {
-      // TODO: API call to backend
-      // const response = await apiClient.get('/properties');
-      // items.value = response.data;
+      // Симуляция запроса к бэкенду через mock данные
+      const data = await propertiesApi.getMockData();
+      items.value = normalizeProperties(data.Properties || []);
     } catch (err) {
       error.value = err.message || 'Ошибка загрузки объектов';
       throw err;
@@ -95,3 +96,46 @@ export const usePropertiesStore = defineStore('properties', () => {
     removeProperty,
   };
 });
+
+/**
+ * Нормализует данные из бэкенда во внутренний формат
+ */
+function normalizeProperties(properties) {
+  return properties.map((prop) => ({
+    id: prop.Id,
+    dealType: prop.DealType,
+    propertyType: prop.PropertyType,
+    status: prop.Status,
+    price: Number(prop.Price) || 0,
+    pricePerMeter: Number(prop.PPM) || 0,
+    area: Number(prop.Area) || 0,
+    rooms: Number(prop.Rooms) || 0,
+    floor: Number(prop.Floor) || 0,
+    isApart: prop.isApart,
+    name: prop.zkName || '',
+    endOfBuilding: prop.EndOfBuilding || '',
+    address: prop.Address || '',
+    center: parseCoords(prop.coords),
+    planUrl: prop.planUrl || '',
+    url: prop.Url || '',
+    description: prop.Description || '',
+  }));
+}
+
+/**
+ * Парсит координаты из строки формата "56,79163 60,608127" в [lng, lat]
+ */
+function parseCoords(coordsString) {
+  if (!coordsString || typeof coordsString !== 'string') {
+    return null;
+  }
+
+  const parts = coordsString.split(' ').map((s) => parseFloat(s.replace(',', '.')));
+  if (parts.length !== 2 || parts.some((p) => isNaN(p))) {
+    return null;
+  }
+
+  // Формат: "lat lng" -> конвертируем в [lng, lat]
+  const [lat, lng] = parts;
+  return [lng, lat];
+}

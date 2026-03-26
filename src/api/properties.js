@@ -12,6 +12,15 @@ export const propertiesApi = {
   remove: (id) => apiClient.delete(`/properties/${id}`),
 
   search: (query) => apiClient.get('/properties/search', { params: { query } }),
+
+  // Временный метод для загрузки из JSON (симуляция бэка)
+  getMockData: async () => {
+    const response = await fetch('/data/parsing-properties.json');
+    if (!response.ok) {
+      throw new Error('Failed to load mock data');
+    }
+    return response.json();
+  },
 };
 
 export default propertiesApi;

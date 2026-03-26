@@ -1,159 +1,104 @@
-import { ref, computed } from 'vue';
-
 /**
  * Composable для кластеризации маркеров на карте
  */
 export function useMarkerClustering() {
-  const zoom = ref(11);
-
-  /**
-   * Определяет режим отображения маркеров в зависимости от зума
-   */
-  const displayMode = computed(() => {
-    if (zoom.value >= 14) {
-      return 'price'; // Показывать отдельные маркеры с ценой
-    }
-    if (zoom.value >= 12) {
-      return 'building'; // Группировать по зданиям
-    }
-    return 'cluster'; // Кластеризация по областям
-  });
-
   /**
    * Получает размер ячейки кластеризации для текущего зума
+   * 5 уровней кластеризации:
+   * - zoom >= 14: без кластеризации (0)
+   * - zoom 12-14: слабая кластеризация (0.008)
+   * - zoom 10-12: средняя кластеризация (0.03)
+   * - zoom 8-10: сильная кластеризация (0.1)
+   * - zoom < 8: максимальная кластеризация (0.3)
    */
-  function getClusterCellSize(currentZoom) {
-    if (currentZoom <= 9.5) {
-      return 0.25;
+  function getClusterSize(zoom) {
+    if (zoom >= 14) {
+      return 0; // Без кластеризации
     }
-    if (currentZoom <= 10.5) {
-      return 0.14;
+    if (zoom >= 12) {
+      return 0.008; // Слабая кластеризация
     }
-    if (currentZoom <= 11.5) {
-      return 0.08;
+    if (zoom >= 10) {
+      return 0.03; // Средняя кластеризация
     }
-    return 0.04;
+    if (zoom >= 8) {
+      return 0.1; // Сильная кластеризация
+    }
+    return 0.9; // Максимальная кластеризация
   }
 
   /**
-   * Получает ключ здания для группировки
+   * Группирует свойства по кластерам
+   * @param {Array} properties - Массив объектов с координатами
+   * @param {number} cellSize - Размер ячейки кластеризации
+   * @returns {Array} - Массив маркеров (кластеры или одиночные объекты)
    */
-  function getBuildingKey(property) {
-    const rawAddress = property.address || property.addressQuery || '';
-    const normalizedAddress = rawAddress.trim().toLowerCase();
-    if (normalizedAddress) {
-      return normalizedAddress;
+  function groupMarkers(properties, cellSize) {
+    if (!cellSize || cellSize <= 0) {
+      // Без кластеризации - возвращаем все объекты
+      return properties.map((p) => ({
+        type: 'property',
+        id: `prop-${p.id}`,
+        propertyId: p.id,
+        price: p.price,
+        center: p.center,
+        property: p,
+      }));
     }
-    return `${property.center[0].toFixed(5)}:${property.center[1].toFixed(5)}`;
-  }
 
-  /**
-   * Группирует свойства по зданиям
-   */
-  function groupByBuilding(properties) {
+    // Группируем по ячейкам
     const grouped = new Map();
 
     for (const property of properties) {
-      const key = getBuildingKey(property);
-      const existing = grouped.get(key);
-
-      if (existing) {
-        existing.properties.push(property);
-        existing.sumLng += property.center[0];
-        existing.sumLat += property.center[1];
-      } else {
-        grouped.set(key, {
-          key,
-          properties: [property],
-          sumLng: property.center[0],
-          sumLat: property.center[1],
-        });
-      }
-    }
-
-    return Array.from(grouped.values()).map((group) => ({
-      id: `building-${group.key}`,
-      kind: 'building',
-      count: group.properties.length,
-      propertyIds: group.properties.map((p) => p.id),
-      center: [group.sumLng / group.properties.length, group.sumLat / group.properties.length],
-    }));
-  }
-
-  /**
-   * Создает кластеры для текущего уровня зума
-   */
-  function createClusters(buildingMarkers, currentZoom) {
-    if (!buildingMarkers.length) {
-      return [];
-    }
-
-    // Полный кластер для малого зума
-    if (currentZoom <= 8.5) {
-      const totalCount = buildingMarkers.reduce((sum, m) => sum + m.count, 0);
-      const sumLng = buildingMarkers.reduce((sum, m) => sum + m.center[0] * m.count, 0);
-      const sumLat = buildingMarkers.reduce((sum, m) => sum + m.center[1] * m.count, 0);
-
-      return [
-        {
-          id: 'cluster-all',
-          kind: 'cluster',
-          count: totalCount,
-          propertyIds: buildingMarkers.flatMap((m) => m.propertyIds),
-          center: [sumLng / totalCount, sumLat / totalCount],
-        },
-      ];
-    }
-
-    // Кластеризация по ячейкам
-    const cellSize = getClusterCellSize(currentZoom);
-    const grouped = new Map();
-
-    for (const marker of buildingMarkers) {
-      const [lng, lat] = marker.center;
+      const [lng, lat] = property.center;
       const gridX = Math.floor(lng / cellSize);
       const gridY = Math.floor(lat / cellSize);
       const key = `${gridX}:${gridY}`;
+
       const existing = grouped.get(key);
 
       if (existing) {
-        existing.markers.push(marker);
-        existing.sumLng += lng * marker.count;
-        existing.sumLat += lat * marker.count;
-        existing.count += marker.count;
-        existing.propertyIds.push(...marker.propertyIds);
+        // Если в ячейке уже есть что-то
+        if (existing.type === 'cluster') {
+          // Добавляем в существующий кластер
+          existing.count++;
+          existing.properties.push(property);
+          // Обновляем центр кластера (средневзвешенное)
+          existing.center = [
+            (existing.center[0] * (existing.count - 1) + lng) / existing.count,
+            (existing.center[1] * (existing.count - 1) + lat) / existing.count,
+          ];
+        } else {
+          // Превращаем одиночный маркер в кластер из 2 объектов
+          grouped.set(key, {
+            type: 'cluster',
+            id: `cluster-${key}`,
+            count: 2,
+            center: [
+              (existing.center[0] + lng) / 2,
+              (existing.center[1] + lat) / 2,
+            ],
+            properties: [existing.property, property],
+          });
+        }
       } else {
+        // Первый объект в ячейке - создаём одиночный маркер
         grouped.set(key, {
-          key,
-          markers: [marker],
-          sumLng: lng * marker.count,
-          sumLat: lat * marker.count,
-          count: marker.count,
-          propertyIds: [...marker.propertyIds],
+          type: 'property',
+          id: `prop-${property.id}`,
+          propertyId: property.id,
+          price: property.price,
+          center: property.center,
+          property,
         });
       }
     }
 
-    return Array.from(grouped.values()).map((group) => ({
-      id: `cluster-${group.key}`,
-      kind: 'cluster',
-      count: group.count,
-      propertyIds: group.propertyIds,
-      center: [group.sumLng / group.count, group.sumLat / group.count],
-    }));
-  }
-
-  function setZoom(newZoom) {
-    zoom.value = newZoom;
+    return Array.from(grouped.values());
   }
 
   return {
-    zoom,
-    displayMode,
-    setZoom,
-    getClusterCellSize,
-    getBuildingKey,
-    groupByBuilding,
-    createClusters,
+    getClusterSize,
+    groupMarkers,
   };
 }
