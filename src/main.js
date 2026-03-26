@@ -1,11 +1,17 @@
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import { createYmaps } from 'vue-yandex-maps';
+
 import App from './App.vue';
-import { getYandexMapsApiKey } from './utils/yandexApiKey';
+import router from './router';
+
 import 'vue-yandex-maps/css';
+import './style.css';
 
 const app = createApp(App);
-const yandexMapsApiKey = getYandexMapsApiKey();
+const pinia = createPinia();
+
+const yandexMapsApiKey = import.meta.env.VITE_YANDEX_MAPS_API_KEY || '';
 
 if (yandexMapsApiKey) {
   app.use(
@@ -16,7 +22,10 @@ if (yandexMapsApiKey) {
     })
   );
 } else {
-  console.warn('VITE_YANDEX_MAPS_API_KEY is empty. Map is disabled.');
+  console.warn('VITE_YANDEX_MAPS_API_KEY is not set. Map functionality will be limited.');
 }
+
+app.use(pinia);
+app.use(router);
 
 app.mount('#app');
