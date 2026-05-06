@@ -8,7 +8,7 @@
       v-if="marker.type === 'cluster'"
       class="cluster-marker"
       :class="{ 'cluster-marker--faded': isDistrictSelected && !marker.isInDistrict }"
-      @click="handleClusterClick(marker)"
+      @click="handleClusterClick"
     >
       {{ marker.count }}
     </div>
@@ -99,9 +99,8 @@ const visibleMarkers = computed(() => {
   });
 });
 
-function handleClusterClick(cluster) {
+function handleClusterClick() {
   // При клике на кластер можно зумить карту
-  console.log('Cluster click:', cluster);
 }
 
 function handlePropertyClick(property) {

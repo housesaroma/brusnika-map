@@ -74,10 +74,7 @@ export function useMarkerClustering() {
             type: 'cluster',
             id: `cluster-${key}`,
             count: 2,
-            center: [
-              (existing.center[0] + lng) / 2,
-              (existing.center[1] + lat) / 2,
-            ],
+            center: [(existing.center[0] + lng) / 2, (existing.center[1] + lat) / 2],
             properties: [existing.property, property],
           });
         }

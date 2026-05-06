@@ -1,0 +1,6 @@
+﻿
+openapi info                                   paths                                                                   
+------- ----                                   -----                                                                   
+3.0.1   @{title=RealtyAnalizator; version=1.0} @{/api/v1/map/{cityId}/buildings=; /api/v1/map/{cityId}/{buildingsId}...
+
+

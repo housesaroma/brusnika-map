@@ -13,7 +13,11 @@ export default function SearchBar({ onSearch }) {
       const res = await fetch(url, { headers: { 'Accept-Language': 'ru' } });
       const data = await res.json();
       if (data.length > 0) {
-        onSearch({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: data[0].display_name });
+        onSearch({
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon),
+          label: data[0].display_name,
+        });
       } else {
         alert('Объект не найден. Уточните запрос.');
       }
@@ -30,8 +34,8 @@ export default function SearchBar({ onSearch }) {
       <input
         type="text"
         value={query}
-        onChange={e => setQuery(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && handleSearch()}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
         placeholder="Поиск адреса или объекта..."
         className="flex-1 text-sm outline-none bg-transparent text-gray-800 placeholder-gray-400"
       />

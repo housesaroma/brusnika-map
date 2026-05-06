@@ -3,9 +3,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { DISTRICTS, MATERIALS, RENOVATIONS, formatPrice, formatPriceRaw, findAnalogs, DEMO_FLATS } from '@/lib/demoData';
+import {
+  DISTRICTS,
+  MATERIALS,
+  RENOVATIONS,
+  formatPrice,
+  formatPriceRaw,
+  findAnalogs,
+  DEMO_FLATS,
+} from '@/lib/demoData';
 import { Calculator, TrendingUp, Check } from 'lucide-react';
 import AnalogSlider from './AnalogSlider';
 
@@ -67,16 +81,13 @@ function StepLoader({ onDone }) {
               <div className="relative w-12 h-12 shrink-0">
                 <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
                   {/* Track */}
-                  <circle
-                    cx="24" cy="24" r="20"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="3"
-                  />
+                  <circle cx="24" cy="24" r="20" fill="none" stroke="#e5e7eb" strokeWidth="3" />
                   {/* Progress */}
                   {(isActive || isDone) && (
                     <circle
-                      cx="24" cy="24" r="20"
+                      cx="24"
+                      cy="24"
+                      r="20"
                       fill="none"
                       stroke={isDone ? '#111827' : '#111827'}
                       strokeWidth="3"
@@ -99,7 +110,9 @@ function StepLoader({ onDone }) {
                 </div>
               </div>
               {/* Label */}
-              <span className={`text-sm ${isDone ? 'text-muted-foreground' : isActive ? 'text-foreground font-medium' : 'text-muted-foreground/40'}`}>
+              <span
+                className={`text-sm ${isDone ? 'text-muted-foreground' : isActive ? 'text-foreground font-medium' : 'text-muted-foreground/40'}`}
+              >
                 {step.label}
               </span>
             </div>
@@ -112,16 +125,24 @@ function StepLoader({ onDone }) {
 
 export default function ValuationModal({ open, onClose }) {
   const [params, setParams] = useState({
-    rooms: 2, area: 55, kitchen_area: 10, floor: 5,
-    total_floors: 12, district: 'Центр', material: 'monolith',
-    renovation: 'cosmetic', balcony: true, year_built: 2018,
-    nearest_metro: 'Площадь 1905 года', metro_distance_min: 10,
+    rooms: 2,
+    area: 55,
+    kitchen_area: 10,
+    floor: 5,
+    total_floors: 12,
+    district: 'Центр',
+    material: 'monolith',
+    renovation: 'cosmetic',
+    balcony: true,
+    year_built: 2018,
+    nearest_metro: 'Площадь 1905 года',
+    metro_distance_min: 10,
   });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const updateParam = (key, value) => {
-    setParams(prev => ({ ...prev, [key]: value }));
+    setParams((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleEvaluate = () => {
@@ -130,11 +151,31 @@ export default function ValuationModal({ open, onClose }) {
   };
 
   const handleLoadingDone = () => {
-    const basePricePerSqm = params.district === "Центр" ? 130000 : params.district === "Верх-Исетский" ? 110000 : params.district === "ВИЗ" ? 105000 : 85000;
-    const adjustedPrice = basePricePerSqm
-      * (params.renovation === 'euro' ? 1.15 : params.renovation === 'designer' ? 1.25 : params.renovation === 'cosmetic' ? 1.05 : 0.95)
-      * (params.material === 'monolith_brick' ? 1.1 : params.material === 'brick' ? 1.05 : params.material === 'monolith' ? 1.08 : 1)
-      * (1 - Math.max(0, params.metro_distance_min - 5) * 0.005);
+    const basePricePerSqm =
+      params.district === 'Центр'
+        ? 130000
+        : params.district === 'Верх-Исетский'
+          ? 110000
+          : params.district === 'ВИЗ'
+            ? 105000
+            : 85000;
+    const adjustedPrice =
+      basePricePerSqm *
+      (params.renovation === 'euro'
+        ? 1.15
+        : params.renovation === 'designer'
+          ? 1.25
+          : params.renovation === 'cosmetic'
+            ? 1.05
+            : 0.95) *
+      (params.material === 'monolith_brick'
+        ? 1.1
+        : params.material === 'brick'
+          ? 1.05
+          : params.material === 'monolith'
+            ? 1.08
+            : 1) *
+      (1 - Math.max(0, params.metro_distance_min - 5) * 0.005);
     const predictedPrice = Math.round(params.area * adjustedPrice);
     const pricePerSqm = Math.round(adjustedPrice);
 
@@ -145,7 +186,8 @@ export default function ValuationModal({ open, onClose }) {
       predicted_price: predictedPrice,
       price_per_sqm: pricePerSqm,
       address: `${params.district}, ${params.rooms}-комн.`,
-      lat: 56.838, lng: 60.597,
+      lat: 56.838,
+      lng: 60.597,
       source: 'cian',
     };
 
@@ -155,7 +197,10 @@ export default function ValuationModal({ open, onClose }) {
       predictedPrice,
       pricePerSqm,
       analogs,
-      avgAnalogPrice: analogs.length > 0 ? Math.round(analogs.reduce((s, a) => s + a.price, 0) / analogs.length) : 0,
+      avgAnalogPrice:
+        analogs.length > 0
+          ? Math.round(analogs.reduce((s, a) => s + a.price, 0) / analogs.length)
+          : 0,
     });
     setLoading(false);
   };
@@ -177,8 +222,12 @@ export default function ValuationModal({ open, onClose }) {
             <div className="overflow-y-auto flex-1 space-y-4 pr-1">
               <div className="bg-primary/5 rounded-xl p-5 border border-primary/20 text-center">
                 <p className="text-sm text-muted-foreground mb-1">Прогнозная стоимость</p>
-                <p className="text-3xl font-bold text-primary">{formatPrice(result.predictedPrice)}</p>
-                <p className="text-sm text-muted-foreground mt-1">{formatPriceRaw(result.pricePerSqm)}/м²</p>
+                <p className="text-3xl font-bold text-primary">
+                  {formatPrice(result.predictedPrice)}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {formatPriceRaw(result.pricePerSqm)}/м²
+                </p>
                 {result.avgAnalogPrice > 0 && (
                   <p className="text-xs text-muted-foreground mt-2">
                     Средняя цена аналогов: {formatPrice(result.avgAnalogPrice)}
@@ -199,37 +248,75 @@ export default function ValuationModal({ open, onClose }) {
               {/* Section: Required */}
               <div className="mt-2">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-semibold text-foreground uppercase tracking-wider">Обязательные поля</span>
-                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">Нужны для расчёта</span>
+                  <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                    Обязательные поля
+                  </span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                    Нужны для расчёта
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <FieldWrap label="Комнат" required>
-                    <Select value={String(params.rooms)} onValueChange={v => updateParam('rooms', Number(v))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select
+                      value={String(params.rooms)}
+                      onValueChange={(v) => updateParam('rooms', Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        {[1,2,3,4,5].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {n}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FieldWrap>
                   <FieldWrap label="Общая площадь (м²)" required>
-                    <Input type="number" value={params.area} onChange={e => updateParam('area', Number(e.target.value))} />
+                    <Input
+                      type="number"
+                      value={params.area}
+                      onChange={(e) => updateParam('area', Number(e.target.value))}
+                    />
                   </FieldWrap>
                   <FieldWrap label="Район" required>
-                    <Select value={params.district} onValueChange={v => updateParam('district', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select
+                      value={params.district}
+                      onValueChange={(v) => updateParam('district', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        {DISTRICTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        {DISTRICTS.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FieldWrap>
                   <FieldWrap label="Этаж" required>
-                    <Input type="number" value={params.floor} onChange={e => updateParam('floor', Number(e.target.value))} />
+                    <Input
+                      type="number"
+                      value={params.floor}
+                      onChange={(e) => updateParam('floor', Number(e.target.value))}
+                    />
                   </FieldWrap>
                   <FieldWrap label="Этажность дома" required>
-                    <Input type="number" value={params.total_floors} onChange={e => updateParam('total_floors', Number(e.target.value))} />
+                    <Input
+                      type="number"
+                      value={params.total_floors}
+                      onChange={(e) => updateParam('total_floors', Number(e.target.value))}
+                    />
                   </FieldWrap>
                   <FieldWrap label="Расстояние до метро (мин)" required>
-                    <Input type="number" value={params.metro_distance_min} onChange={e => updateParam('metro_distance_min', Number(e.target.value))} />
+                    <Input
+                      type="number"
+                      value={params.metro_distance_min}
+                      onChange={(e) => updateParam('metro_distance_min', Number(e.target.value))}
+                    />
                   </FieldWrap>
                 </div>
               </div>
@@ -239,34 +326,67 @@ export default function ValuationModal({ open, onClose }) {
               {/* Section: Optional */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Дополнительные поля</span>
-                  <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Повышают точность</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Дополнительные поля
+                  </span>
+                  <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">
+                    Повышают точность
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <FieldWrap label="Материал дома">
-                    <Select value={params.material} onValueChange={v => updateParam('material', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select
+                      value={params.material}
+                      onValueChange={(v) => updateParam('material', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(MATERIALS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                        {Object.entries(MATERIALS).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>
+                            {v}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FieldWrap>
                   <FieldWrap label="Ремонт">
-                    <Select value={params.renovation} onValueChange={v => updateParam('renovation', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select
+                      value={params.renovation}
+                      onValueChange={(v) => updateParam('renovation', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(RENOVATIONS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                        {Object.entries(RENOVATIONS).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>
+                            {v}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FieldWrap>
                   <FieldWrap label="Площадь кухни (м²)">
-                    <Input type="number" value={params.kitchen_area} onChange={e => updateParam('kitchen_area', Number(e.target.value))} />
+                    <Input
+                      type="number"
+                      value={params.kitchen_area}
+                      onChange={(e) => updateParam('kitchen_area', Number(e.target.value))}
+                    />
                   </FieldWrap>
                   <FieldWrap label="Год постройки">
-                    <Input type="number" value={params.year_built} onChange={e => updateParam('year_built', Number(e.target.value))} />
+                    <Input
+                      type="number"
+                      value={params.year_built}
+                      onChange={(e) => updateParam('year_built', Number(e.target.value))}
+                    />
                   </FieldWrap>
                   <div className="flex items-center gap-3 col-span-2 pt-1">
-                    <Switch checked={params.balcony} onCheckedChange={v => updateParam('balcony', v)} />
+                    <Switch
+                      checked={params.balcony}
+                      onCheckedChange={(v) => updateParam('balcony', v)}
+                    />
                     <Label className="text-sm text-muted-foreground">Балкон</Label>
                   </div>
                 </div>
@@ -274,7 +394,10 @@ export default function ValuationModal({ open, onClose }) {
             </div>
 
             <div className="shrink-0 pt-3 border-t border-border mt-3">
-              <Button onClick={handleEvaluate} className="w-full bg-primary hover:bg-primary/90 h-11 text-base font-semibold">
+              <Button
+                onClick={handleEvaluate}
+                className="w-full bg-primary hover:bg-primary/90 h-11 text-base font-semibold"
+              >
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Рассчитать оценку
               </Button>

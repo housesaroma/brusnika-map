@@ -8,7 +8,7 @@
 
 <script setup>
 import { YandexMapFeature } from 'vue-yandex-maps';
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useDistrictsStore } from '@/stores/districts';
 
 const props = defineProps({
@@ -28,17 +28,12 @@ const props = defineProps({
 
 const districtsStore = useDistrictsStore();
 const districtsData = ref(null);
-const loading = ref(false);
-const error = ref('');
 
 onMounted(async () => {
   await loadDistricts();
 });
 
 async function loadDistricts() {
-  loading.value = true;
-  error.value = '';
-
   try {
     const response = await fetch('/data/districts.geojson');
     if (!response.ok) {
@@ -46,10 +41,7 @@ async function loadDistricts() {
     }
     districtsData.value = await response.json();
   } catch (err) {
-    error.value = err.message;
     console.error('Error loading districts:', err);
-  } finally {
-    loading.value = false;
   }
 }
 

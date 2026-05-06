@@ -35,24 +35,15 @@
 </template>
 
 <script setup>
-import {
-  YandexMapClusterer,
-  YandexMapMarker,
-} from 'vue-yandex-maps';
+import { YandexMapClusterer, YandexMapMarker } from 'vue-yandex-maps';
 import { useFormatters } from '@/composables/useFormatters';
 
-const props = defineProps({
+defineProps({
   properties: {
     type: Array,
     default: () => [],
   },
-  selectedPropertyId: {
-    type: String,
-    default: null,
-  },
 });
-
-const emit = defineEmits(['property-click']);
 
 const { formatPrice } = useFormatters();
 </script>

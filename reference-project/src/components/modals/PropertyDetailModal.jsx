@@ -1,7 +1,15 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { formatPrice, formatPriceRaw, RENOVATIONS, MATERIALS, SOURCES, findAnalogs, DEMO_FLATS } from '@/lib/demoData';
+import {
+  formatPrice,
+  formatPriceRaw,
+  RENOVATIONS,
+  MATERIALS,
+  SOURCES,
+  findAnalogs,
+  DEMO_FLATS,
+} from '@/lib/demoData';
 import { MapPin, Layers, Maximize2, Train, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import AnalogSlider from './AnalogSlider';
 
@@ -43,7 +51,9 @@ export default function PropertyDetailModal({ flat, open, onClose }) {
             <div className="bg-muted/50 rounded-xl p-4 border border-border">
               <p className="text-xs text-muted-foreground mb-1">Текущая цена</p>
               <p className="text-2xl font-bold text-foreground">{formatPrice(flat.price)}</p>
-              <p className="text-xs text-muted-foreground">{formatPriceRaw(flat.price_per_sqm)}/м²</p>
+              <p className="text-xs text-muted-foreground">
+                {formatPriceRaw(flat.price_per_sqm)}/м²
+              </p>
             </div>
             <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
               <p className="text-xs text-muted-foreground mb-1">Прогнозная оценка</p>
@@ -54,8 +64,11 @@ export default function PropertyDetailModal({ flat, open, onClose }) {
                 ) : (
                   <TrendingUp className="w-3.5 h-3.5 text-green-600" />
                 )}
-                <span className={`text-xs font-medium ${isOverpriced ? 'text-destructive' : 'text-green-600'}`}>
-                  {isOverpriced ? '' : '+'}{priceDiffPercent}%
+                <span
+                  className={`text-xs font-medium ${isOverpriced ? 'text-destructive' : 'text-green-600'}`}
+                >
+                  {isOverpriced ? '' : '+'}
+                  {priceDiffPercent}%
                 </span>
               </div>
             </div>
@@ -63,12 +76,28 @@ export default function PropertyDetailModal({ flat, open, onClose }) {
 
           {/* Parameters grid */}
           <div className="grid grid-cols-3 gap-3">
-            <ParamCell icon={<Maximize2 className="w-4 h-4" />} label="Площадь" value={`${flat.area} м²`} />
-            <ParamCell icon={<Layers className="w-4 h-4" />} label="Этаж" value={`${flat.floor} / ${flat.total_floors}`} />
+            <ParamCell
+              icon={<Maximize2 className="w-4 h-4" />}
+              label="Площадь"
+              value={`${flat.area} м²`}
+            />
+            <ParamCell
+              icon={<Layers className="w-4 h-4" />}
+              label="Этаж"
+              value={`${flat.floor} / ${flat.total_floors}`}
+            />
             <ParamCell label="Комнат" value={flat.rooms} />
             <ParamCell label="Кухня" value={`${flat.kitchen_area} м²`} />
-            <ParamCell icon={<Train className="w-4 h-4" />} label="Метро" value={`${flat.nearest_metro} (${flat.metro_distance_min} мин)`} />
-            <ParamCell icon={<Calendar className="w-4 h-4" />} label="Год постройки" value={flat.year_built} />
+            <ParamCell
+              icon={<Train className="w-4 h-4" />}
+              label="Метро"
+              value={`${flat.nearest_metro} (${flat.metro_distance_min} мин)`}
+            />
+            <ParamCell
+              icon={<Calendar className="w-4 h-4" />}
+              label="Год постройки"
+              value={flat.year_built}
+            />
             <ParamCell label="Материал" value={MATERIALS[flat.material] || flat.material} />
             <ParamCell label="Балкон" value={flat.balcony ? 'Есть' : 'Нет'} />
           </div>

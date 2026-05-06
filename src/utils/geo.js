@@ -113,3 +113,62 @@ export function getPolygonBBox(coordinates) {
     center: [(minLng + maxLng) / 2, (minLat + maxLat) / 2],
   };
 }
+
+/**
+ * Парсит строку координат полигона в массив [lng, lat]
+ * Поддерживает форматы: JSON, "lat lng;lat lng" и "lat,lng|lat,lng"
+ */
+export function parseGeoPointString(raw) {
+  if (!raw) return [];
+
+  if (Array.isArray(raw)) {
+    return raw
+      .map((point) => (Array.isArray(point) ? point.map(Number) : null))
+      .filter((point) => Array.isArray(point) && point.length === 2);
+  }
+
+  if (typeof raw !== 'string') {
+    return [];
+  }
+
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((point) => (Array.isArray(point) ? point.map(Number) : null))
+          .filter((point) => Array.isArray(point) && point.length === 2);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  const parts = trimmed
+    .split(/[;|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.map((part) => parseCoordsToLngLat(part)).filter(Boolean);
+}
+
+/**
+ * Сериализует массив [lng, lat] в строку "lat lng;lat lng"
+ */
+export function serializeGeoPoints(points) {
+  if (!Array.isArray(points) || points.length === 0) {
+    return '';
+  }
+
+  return points
+    .map((point) => {
+      if (!Array.isArray(point) || point.length !== 2) return null;
+      const [lng, lat] = point;
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+      return `${lat} ${lng}`;
+    })
+    .filter(Boolean)
+    .join(';');
+}

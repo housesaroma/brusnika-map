@@ -4,13 +4,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Building2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function PropertySidebar({ 
-  building, 
-  flats, 
-  selectedFlatId, 
-  onFlatClick, 
+export default function PropertySidebar({
+  building,
+  flats,
+  selectedFlatId,
+  onFlatClick,
   onClose,
-  isOpen 
+  isOpen,
 }) {
   if (!isOpen || !building) return null;
 
@@ -44,7 +44,7 @@ export default function PropertySidebar({
       {/* Flats list */}
       <ScrollArea className="flex-1 px-4 py-3">
         <div className="space-y-3 pb-4">
-          {flats.map(flat => (
+          {flats.map((flat) => (
             <PropertyCard
               key={flat.id}
               flat={flat}

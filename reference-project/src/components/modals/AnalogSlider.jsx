@@ -40,7 +40,9 @@ export default function AnalogSlider({ analogs }) {
             className="min-w-[240px] max-w-[240px] border border-border rounded-xl p-3 bg-muted/30 hover:bg-muted/60 transition-colors shrink-0"
           >
             <div className="flex justify-between items-start mb-2">
-              <p className="font-semibold text-sm">{flat.rooms}-комн. · {flat.area} м²</p>
+              <p className="font-semibold text-sm">
+                {flat.rooms}-комн. · {flat.area} м²
+              </p>
               {flat.similarity && (
                 <Badge className="text-[10px] bg-primary/10 text-primary border-0">
                   {Math.round(flat.similarity * 100)}%
@@ -52,7 +54,10 @@ export default function AnalogSlider({ analogs }) {
               <span className="truncate">{flat.address}</span>
             </p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-              <span className="flex items-center gap-0.5"><Layers className="w-3 h-3" />{flat.floor}/{flat.total_floors}</span>
+              <span className="flex items-center gap-0.5">
+                <Layers className="w-3 h-3" />
+                {flat.floor}/{flat.total_floors}
+              </span>
               <span>·</span>
               <span>{MATERIALS[flat.material] || flat.material}</span>
             </div>

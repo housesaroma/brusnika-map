@@ -1,7 +1,13 @@
 import React from 'react';
 import { Star, Pencil, X, Plus, Minus } from 'lucide-react';
 
-export function FloatControlsInner({ onFavorites, onToggleDrawing, isDrawing, onZoomIn, onZoomOut }) {
+export function FloatControlsInner({
+  onFavorites,
+  onToggleDrawing,
+  isDrawing,
+  onZoomIn,
+  onZoomOut,
+}) {
   return (
     <div className="flex flex-col gap-2 items-center">
       <button

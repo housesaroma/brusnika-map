@@ -29,7 +29,7 @@ export default function LeftNavPanel({
       onToggleHeatmap(null);
       setShowHeatmapMenu(false);
     } else {
-      setShowHeatmapMenu(v => !v);
+      setShowHeatmapMenu((v) => !v);
     }
   };
 
@@ -89,17 +89,25 @@ export default function LeftNavPanel({
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-1">
                 <span className="text-sm font-medium truncate">Тепловая карта</span>
-                {!heatMode && <ChevronRight className={`w-3 h-3 text-muted-foreground transition-transform ${showHeatmapMenu ? 'rotate-90' : ''}`} />}
+                {!heatMode && (
+                  <ChevronRight
+                    className={`w-3 h-3 text-muted-foreground transition-transform ${showHeatmapMenu ? 'rotate-90' : ''}`}
+                  />
+                )}
               </div>
-              <p className={`text-[11px] truncate mt-0.5 ${heatMode ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                {heatMode ? HEATMAP_MODES.find(m => m.id === heatMode)?.label : 'Выберите параметр'}
+              <p
+                className={`text-[11px] truncate mt-0.5 ${heatMode ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}
+              >
+                {heatMode
+                  ? HEATMAP_MODES.find((m) => m.id === heatMode)?.label
+                  : 'Выберите параметр'}
               </p>
             </div>
           </button>
 
           {showHeatmapMenu && !heatMode && (
             <div className="mt-1 ml-2 space-y-0.5 bg-muted/50 rounded-xl p-1.5 border border-border">
-              {HEATMAP_MODES.map(mode => (
+              {HEATMAP_MODES.map((mode) => (
                 <button
                   key={mode.id}
                   onClick={() => handleHeatmapMode(mode.id)}
@@ -126,9 +134,7 @@ function NavItem({ icon, label, description, onClick, active, badge }) {
     <button
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-150 text-left group ${
-        active
-          ? 'bg-primary text-primary-foreground shadow-sm'
-          : 'hover:bg-muted text-foreground'
+        active ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-foreground'
       }`}
     >
       <div className={`shrink-0 ${active ? 'text-primary-foreground' : 'text-primary'}`}>
@@ -143,7 +149,9 @@ function NavItem({ icon, label, description, onClick, active, badge }) {
             </span>
           )}
         </div>
-        <p className={`text-[11px] truncate mt-0.5 ${active ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+        <p
+          className={`text-[11px] truncate mt-0.5 ${active ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}
+        >
           {description}
         </p>
       </div>

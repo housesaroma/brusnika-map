@@ -2,7 +2,11 @@
   <Drawer v-model:visible="visible" position="right" :header="headerTitle">
     <div v-if="property" class="property-drawer">
       <div v-if="property.planUrl" class="property-drawer__image-container">
-        <img :src="property.planUrl" :alt="property.name || property.address" class="property-drawer__image" />
+        <img
+          :src="property.planUrl"
+          :alt="property.name || property.address"
+          class="property-drawer__image"
+        />
       </div>
 
       <div class="property-drawer__content">
@@ -67,7 +71,13 @@
         </div>
 
         <div class="property-drawer__actions">
-          <a v-if="property.url" :href="property.url" target="_blank" rel="noopener noreferrer" class="btn-primary">
+          <a
+            v-if="property.url"
+            :href="property.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn-primary"
+          >
             <i class="pi pi-external-link"></i>
             Открыть источник
           </a>

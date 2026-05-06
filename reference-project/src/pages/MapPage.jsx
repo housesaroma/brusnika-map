@@ -12,11 +12,17 @@ import { DEMO_BUILDINGS, DEMO_FLATS } from '@/lib/demoData';
 import { toast } from 'sonner';
 
 const defaultFilters = {
-  rooms_min: '', rooms_max: '',
-  area_min: '', area_max: '',
-  price_min: '', price_max: '',
-  floor_min: '', floor_max: '',
-  district: 'all', material: 'all', renovation: 'all',
+  rooms_min: '',
+  rooms_max: '',
+  area_min: '',
+  area_max: '',
+  price_min: '',
+  price_max: '',
+  floor_min: '',
+  floor_max: '',
+  district: 'all',
+  material: 'all',
+  renovation: 'all',
 };
 
 export default function MapPage() {
@@ -46,44 +52,47 @@ export default function MapPage() {
   }, [filters]);
 
   // Apply filters to flats
-  const applyFiltersToFlats = useCallback((flats) => {
-    return flats.filter(f => {
-      if (filters.rooms_min && f.rooms < Number(filters.rooms_min)) return false;
-      if (filters.rooms_max && f.rooms > Number(filters.rooms_max)) return false;
-      if (filters.area_min && f.area < Number(filters.area_min)) return false;
-      if (filters.area_max && f.area > Number(filters.area_max)) return false;
-      if (filters.price_min && f.price < Number(filters.price_min)) return false;
-      if (filters.price_max && f.price > Number(filters.price_max)) return false;
-      if (filters.floor_min && f.floor < Number(filters.floor_min)) return false;
-      if (filters.floor_max && f.floor > Number(filters.floor_max)) return false;
-      if (filters.district !== 'all' && f.district !== filters.district) return false;
-      if (filters.material !== 'all' && f.material !== filters.material) return false;
-      if (filters.renovation !== 'all' && f.renovation !== filters.renovation) return false;
-      return true;
-    });
-  }, [filters]);
+  const applyFiltersToFlats = useCallback(
+    (flats) => {
+      return flats.filter((f) => {
+        if (filters.rooms_min && f.rooms < Number(filters.rooms_min)) return false;
+        if (filters.rooms_max && f.rooms > Number(filters.rooms_max)) return false;
+        if (filters.area_min && f.area < Number(filters.area_min)) return false;
+        if (filters.area_max && f.area > Number(filters.area_max)) return false;
+        if (filters.price_min && f.price < Number(filters.price_min)) return false;
+        if (filters.price_max && f.price > Number(filters.price_max)) return false;
+        if (filters.floor_min && f.floor < Number(filters.floor_min)) return false;
+        if (filters.floor_max && f.floor > Number(filters.floor_max)) return false;
+        if (filters.district !== 'all' && f.district !== filters.district) return false;
+        if (filters.material !== 'all' && f.material !== filters.material) return false;
+        if (filters.renovation !== 'all' && f.renovation !== filters.renovation) return false;
+        return true;
+      });
+    },
+    [filters]
+  );
 
   // Get filtered flats for polygon or building
   const filteredFlats = useMemo(() => {
     let flats = DEMO_FLATS;
     if (activePolygon && activePolygon.length > 2) {
-      flats = flats.filter(f => isPointInPolygon([f.lat, f.lng], activePolygon));
+      flats = flats.filter((f) => isPointInPolygon([f.lat, f.lng], activePolygon));
     }
     return applyFiltersToFlats(flats);
   }, [activePolygon, applyFiltersToFlats]);
 
   // Buildings with updated flat counts
   const displayBuildings = useMemo(() => {
-    return DEMO_BUILDINGS.map(b => {
-      const bFlats = filteredFlats.filter(f => f.building_id === b.id);
+    return DEMO_BUILDINGS.map((b) => {
+      const bFlats = filteredFlats.filter((f) => f.building_id === b.id);
       return { ...b, flat_count: bFlats.length };
-    }).filter(b => b.flat_count > 0);
+    }).filter((b) => b.flat_count > 0);
   }, [filteredFlats]);
 
   // Flats for selected building
   const buildingFlats = useMemo(() => {
     if (!selectedBuilding) return [];
-    return filteredFlats.filter(f => f.building_id === selectedBuilding.id);
+    return filteredFlats.filter((f) => f.building_id === selectedBuilding.id);
   }, [selectedBuilding, filteredFlats]);
 
   // Handlers
@@ -131,7 +140,7 @@ export default function MapPage() {
       filters: {},
       geo_points: activePolygon || [],
     };
-    setFavorites(prev => [...prev, newFav]);
+    setFavorites((prev) => [...prev, newFav]);
     toast.success('Полигон сохранён в избранное');
   };
 
@@ -146,7 +155,7 @@ export default function MapPage() {
       filters: filtersToSave,
       geo_points: activePolygon || [],
     };
-    setFavorites(prev => [...prev, newFav]);
+    setFavorites((prev) => [...prev, newFav]);
     toast.success('Конфигурация сохранена');
   };
 
@@ -156,12 +165,12 @@ export default function MapPage() {
   };
 
   const handleDeleteFavorite = (id) => {
-    setFavorites(prev => prev.filter(f => f.id !== id));
+    setFavorites((prev) => prev.filter((f) => f.id !== id));
     toast.success('Удалено');
   };
 
   const handleRenameFavorite = (id, newName) => {
-    setFavorites(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
+    setFavorites((prev) => prev.map((f) => (f.id === id ? { ...f, name: newName } : f)));
   };
 
   return (
@@ -178,62 +187,68 @@ export default function MapPage() {
 
       {/* Map area (offset by nav width) */}
       <div className="flex-1 relative" style={{ marginLeft: 220 }}>
-      <SearchBar onSearch={setSearchTarget} />
-      <MapView
-        buildings={displayBuildings}
-        selectedBuildingId={selectedBuilding?.id}
-        onBuildingClick={handleBuildingClick}
-        analogFlats={[]}
-        isDrawing={isDrawing}
-        polygonPoints={polygonPoints}
-        setPolygonPoints={setPolygonPoints}
-        onPolygonComplete={handlePolygonComplete}
-        savedPolygon={activePolygon}
-        onFavorites={() => setShowFavorites(true)}
-        onToggleDrawing={handleToggleDrawing}
-        searchTarget={searchTarget}
-        drawingEnabledAt={drawingEnabledAt}
-        heatMode={heatMode}
-      />
+        <SearchBar onSearch={setSearchTarget} />
+        <MapView
+          buildings={displayBuildings}
+          selectedBuildingId={selectedBuilding?.id}
+          onBuildingClick={handleBuildingClick}
+          analogFlats={[]}
+          isDrawing={isDrawing}
+          polygonPoints={polygonPoints}
+          setPolygonPoints={setPolygonPoints}
+          onPolygonComplete={handlePolygonComplete}
+          savedPolygon={activePolygon}
+          onFavorites={() => setShowFavorites(true)}
+          onToggleDrawing={handleToggleDrawing}
+          searchTarget={searchTarget}
+          drawingEnabledAt={drawingEnabledAt}
+          heatMode={heatMode}
+        />
 
-      {/* Drawing hint */}
-      {isDrawing && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-card/95 backdrop-blur-md rounded-xl shadow-lg border border-primary/30 px-4 py-2.5">
-          <span className="text-sm text-muted-foreground">
-            Точек: <span className="font-semibold text-foreground">{polygonPoints.length}</span>
-          </span>
-          <div className="w-px h-4 bg-border" />
-          <button
-            onClick={handleFinishPolygon}
-            disabled={polygonPoints.length < 3}
-            className="text-sm font-medium text-primary disabled:text-muted-foreground disabled:cursor-not-allowed hover:text-primary/80 transition-colors"
-          >
-            Завершить полигон
-          </button>
-        </div>
-      )}
+        {/* Drawing hint */}
+        {isDrawing && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-card/95 backdrop-blur-md rounded-xl shadow-lg border border-primary/30 px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">
+              Точек: <span className="font-semibold text-foreground">{polygonPoints.length}</span>
+            </span>
+            <div className="w-px h-4 bg-border" />
+            <button
+              onClick={handleFinishPolygon}
+              disabled={polygonPoints.length < 3}
+              className="text-sm font-medium text-primary disabled:text-muted-foreground disabled:cursor-not-allowed hover:text-primary/80 transition-colors"
+            >
+              Завершить полигон
+            </button>
+          </div>
+        )}
 
-      {/* Left sidebar (property list for building) */}
-      <PropertySidebar
-        building={selectedBuilding}
-        flats={buildingFlats}
-        selectedFlatId={selectedFlat?.id}
-        onFlatClick={handleFlatClick}
-        onClose={() => { setSelectedBuilding(null); setSelectedFlat(null); }}
-        isOpen={!!selectedBuilding && !showPolygonSidebar}
-      />
+        {/* Left sidebar (property list for building) */}
+        <PropertySidebar
+          building={selectedBuilding}
+          flats={buildingFlats}
+          selectedFlatId={selectedFlat?.id}
+          onFlatClick={handleFlatClick}
+          onClose={() => {
+            setSelectedBuilding(null);
+            setSelectedFlat(null);
+          }}
+          isOpen={!!selectedBuilding && !showPolygonSidebar}
+        />
 
-      {/* Left sidebar (polygon results) */}
-      <PolygonSidebar
-        isOpen={showPolygonSidebar}
-        flats={filteredFlats}
-        selectedFlatId={selectedFlat?.id}
-        onFlatClick={handleFlatClick}
-        onClose={() => { setShowPolygonSidebar(false); setActivePolygon(null); }}
-        onSaveToFavorites={handleSavePolygonToFavorites}
-      />
-
-      </div>{/* end map area */}
+        {/* Left sidebar (polygon results) */}
+        <PolygonSidebar
+          isOpen={showPolygonSidebar}
+          flats={filteredFlats}
+          selectedFlatId={selectedFlat?.id}
+          onFlatClick={handleFlatClick}
+          onClose={() => {
+            setShowPolygonSidebar(false);
+            setActivePolygon(null);
+          }}
+          onSaveToFavorites={handleSavePolygonToFavorites}
+        />
+      </div>
+      {/* end map area */}
 
       {/* Modals */}
       <PropertyDetailModal
@@ -268,7 +283,7 @@ function isPointInPolygon(point, polygon) {
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const [xi, yi] = polygon[i];
     const [xj, yj] = polygon[j];
-    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
   return inside;

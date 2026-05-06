@@ -5,7 +5,14 @@ import { Input } from '@/components/ui/input';
 import { X, Star, MapPin, Check } from 'lucide-react';
 import PropertyCard from './PropertyCard';
 
-export default function PolygonSidebar({ flats, isOpen, onClose, onFlatClick, selectedFlatId, onSaveToFavorites }) {
+export default function PolygonSidebar({
+  flats,
+  isOpen,
+  onClose,
+  onFlatClick,
+  selectedFlatId,
+  onSaveToFavorites,
+}) {
   const [polygonName, setPolygonName] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -43,9 +50,9 @@ export default function PolygonSidebar({ flats, isOpen, onClose, onFlatClick, se
           <Input
             placeholder="Название полигона..."
             value={polygonName}
-            onChange={e => setPolygonName(e.target.value)}
+            onChange={(e) => setPolygonName(e.target.value)}
             className="h-8 text-sm"
-            onKeyDown={e => e.key === 'Enter' && handleSave()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
           />
           <Button
             size="sm"
@@ -67,7 +74,7 @@ export default function PolygonSidebar({ flats, isOpen, onClose, onFlatClick, se
               Нет объектов в выбранной области
             </p>
           ) : (
-            flats.map(flat => (
+            flats.map((flat) => (
               <PropertyCard
                 key={flat.id}
                 flat={flat}

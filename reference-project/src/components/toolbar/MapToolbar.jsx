@@ -16,14 +16,22 @@ export default function MapToolbar({
   return (
     <TooltipProvider delayDuration={200}>
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-        <ToolbarButton icon={<Calculator className="w-5 h-5" />} label="Оценка стоимости" onClick={onValuation} />
+        <ToolbarButton
+          icon={<Calculator className="w-5 h-5" />}
+          label="Оценка стоимости"
+          onClick={onValuation}
+        />
         <ToolbarButton
           icon={<Filter className="w-5 h-5" />}
           label="Фильтры"
           onClick={onFilters}
           active={hasActiveFilters}
         />
-        <ToolbarButton icon={<Star className="w-5 h-5" />} label="Избранное" onClick={onFavorites} />
+        <ToolbarButton
+          icon={<Star className="w-5 h-5" />}
+          label="Избранное"
+          onClick={onFavorites}
+        />
         <ToolbarButton
           icon={isDrawing ? <X className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
           label={isDrawing ? 'Отменить рисование' : 'Нарисовать полигон'}

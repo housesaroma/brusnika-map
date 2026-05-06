@@ -1,6 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polygon, useMapEvents } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMap,
+  Polygon,
+  useMapEvents,
+} from 'react-leaflet';
 import { FloatControlsInner } from '@/components/toolbar/FloatControls';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -56,7 +64,13 @@ function createAnalogIcon() {
   });
 }
 
-function PolygonDrawer({ isDrawing, onPolygonComplete, polygonPoints, setPolygonPoints, drawingEnabledAt }) {
+function PolygonDrawer({
+  isDrawing,
+  onPolygonComplete,
+  polygonPoints,
+  setPolygonPoints,
+  drawingEnabledAt,
+}) {
   useMapEvents({
     click(e) {
       if (!isDrawing) return;
@@ -64,11 +78,16 @@ function PolygonDrawer({ isDrawing, onPolygonComplete, polygonPoints, setPolygon
       if (Date.now() - drawingEnabledAt < 300) return;
       const newPoints = [...polygonPoints, [e.latlng.lat, e.latlng.lng]];
       setPolygonPoints(newPoints);
-    }
+    },
   });
 
   if (polygonPoints.length < 2) return null;
-  return <Polygon positions={polygonPoints} pathOptions={{ color: '#ff001e', fillColor: '#ff001e', fillOpacity: 0.15, weight: 2 }} />;
+  return (
+    <Polygon
+      positions={polygonPoints}
+      pathOptions={{ color: '#ff001e', fillColor: '#ff001e', fillOpacity: 0.15, weight: 2 }}
+    />
+  );
 }
 
 function FloatControlsWrapper({ onFavorites, onToggleDrawing, isDrawing }) {
@@ -78,7 +97,8 @@ function FloatControlsWrapper({ onFavorites, onToggleDrawing, isDrawing }) {
 
   React.useEffect(() => {
     container.current = document.createElement('div');
-    container.current.style.cssText = 'position:absolute;right:16px;top:50%;transform:translateY(-50%);z-index:1000;pointer-events:all;';
+    container.current.style.cssText =
+      'position:absolute;right:16px;top:50%;transform:translateY(-50%);z-index:1000;pointer-events:all;';
     map.getContainer().appendChild(container.current);
     setMounted(true);
     return () => {
@@ -106,7 +126,7 @@ function FitBounds({ buildings }) {
   const map = useMap();
   useEffect(() => {
     if (buildings.length > 0) {
-      const bounds = buildings.map(b => [b.lat, b.lng]);
+      const bounds = buildings.map((b) => [b.lat, b.lng]);
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, []);
@@ -117,11 +137,11 @@ function FitBounds({ buildings }) {
 function heatColorRGB(t) {
   // blue(0) -> cyan -> green -> yellow -> red(1)
   const stops = [
-    [0,   0,   0, 255],
+    [0, 0, 0, 255],
     [0.25, 0, 200, 150],
-    [0.5, 80, 220,  0],
-    [0.75, 255, 180,  0],
-    [1,   255,   0,  0],
+    [0.5, 80, 220, 0],
+    [0.75, 255, 180, 0],
+    [1, 255, 0, 0],
   ];
   let i = 0;
   while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
@@ -176,14 +196,21 @@ function HeatmapLayer({ buildings, heatMode }) {
         // Compute getValue
         let getValue;
         if (heatMode === 'price') {
-          const districtPrices = { 'Центр': 130000, 'Верх-Исетский': 110000, 'ВИЗ': 105000, 'Октябрьский': 85000, 'Уралмаш': 85000, 'Ленинский': 85000 };
-          getValue = b => districtPrices[b.district] || 85000;
+          const districtPrices = {
+            Центр: 130000,
+            'Верх-Исетский': 110000,
+            ВИЗ: 105000,
+            Октябрьский: 85000,
+            Уралмаш: 85000,
+            Ленинский: 85000,
+          };
+          getValue = (b) => districtPrices[b.district] || 85000;
         } else if (heatMode === 'count') {
-          getValue = b => b.flat_count || 1;
+          getValue = (b) => b.flat_count || 1;
         } else if (heatMode === 'year') {
-          getValue = b => b.year_built || 2000;
+          getValue = (b) => b.year_built || 2000;
         } else {
-          getValue = b => b.metro_distance_min ? 1 / b.metro_distance_min : 0;
+          getValue = (b) => (b.metro_distance_min ? 1 / b.metro_distance_min : 0);
         }
 
         const values = buildings.map(getValue);
@@ -193,7 +220,11 @@ function HeatmapLayer({ buildings, heatMode }) {
         // Project buildings to pixel coords
         const pts = buildings.map((b, i) => {
           const lp = map.latLngToContainerPoint([b.lat, b.lng]);
-          return { x: lp.x, y: lp.y, t: maxVal === minVal ? 0.5 : (values[i] - minVal) / (maxVal - minVal) };
+          return {
+            x: lp.x,
+            y: lp.y,
+            t: maxVal === minVal ? 0.5 : (values[i] - minVal) / (maxVal - minVal),
+          };
         });
 
         // Draw at reduced resolution then scale up for performance
@@ -209,12 +240,17 @@ function HeatmapLayer({ buildings, heatMode }) {
             const cy = py * STEP;
 
             // IDW interpolation (power=2)
-            let wSum = 0, vSum = 0;
+            let wSum = 0,
+              vSum = 0;
             for (const p of pts) {
               const dx = cx - p.x;
               const dy = cy - p.y;
               const d2 = dx * dx + dy * dy;
-              if (d2 < 1) { wSum = 1e9; vSum = p.t * 1e9; break; }
+              if (d2 < 1) {
+                wSum = 1e9;
+                vSum = p.t * 1e9;
+                break;
+              }
               const w = 1 / d2;
               wSum += w;
               vSum += w * p.t;
@@ -222,7 +258,7 @@ function HeatmapLayer({ buildings, heatMode }) {
             const t = wSum > 0 ? vSum / wSum : 0.5;
             const [r, g, b] = heatColorRGB(Math.max(0, Math.min(1, t)));
             const idx = (py * imgW + px) * 4;
-            data[idx]     = r;
+            data[idx] = r;
             data[idx + 1] = g;
             data[idx + 2] = b;
             data[idx + 3] = 160;
@@ -238,7 +274,7 @@ function HeatmapLayer({ buildings, heatMode }) {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(offscreen, 0, 0, imgW, imgH, 0, 0, mapSize.x, mapSize.y);
-      }
+      },
     });
 
     const layer = new CanvasLayer();
@@ -284,7 +320,7 @@ export default function MapView({
 }) {
   return (
     <MapContainer
-      center={[56.8380, 60.5970]}
+      center={[56.838, 60.597]}
       zoom={13}
       zoomControl={false}
       className="w-full h-full z-0"
@@ -302,7 +338,7 @@ export default function MapView({
 
       {heatMode && <HeatmapLayer buildings={buildings} heatMode={heatMode} />}
 
-      {buildings.map(b => (
+      {buildings.map((b) => (
         <Marker
           key={b.id}
           position={[b.lat, b.lng]}
@@ -312,29 +348,32 @@ export default function MapView({
           <Popup>
             <div className="font-inter text-sm">
               <p className="font-semibold">{b.address}</p>
-              <p className="text-muted-foreground">{b.district} · {b.flat_count} квартир</p>
+              <p className="text-muted-foreground">
+                {b.district} · {b.flat_count} квартир
+              </p>
             </div>
           </Popup>
         </Marker>
       ))}
 
-      {analogFlats.map(f => (
-        <Marker
-          key={f.id}
-          position={[f.lat, f.lng]}
-          icon={createAnalogIcon()}
-        >
+      {analogFlats.map((f) => (
+        <Marker key={f.id} position={[f.lat, f.lng]} icon={createAnalogIcon()}>
           <Popup>
             <div className="font-inter text-sm">
               <p className="font-semibold">{f.address}</p>
-              <p>{f.rooms}к · {f.area} м²</p>
+              <p>
+                {f.rooms}к · {f.area} м²
+              </p>
             </div>
           </Popup>
         </Marker>
       ))}
 
       {savedPolygon && savedPolygon.length > 2 && (
-        <Polygon positions={savedPolygon} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 2 }} />
+        <Polygon
+          positions={savedPolygon}
+          pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 2 }}
+        />
       )}
 
       <PolygonDrawer
