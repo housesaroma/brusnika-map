@@ -52,7 +52,7 @@
 
       <PropertySidebar
         :building="selectedBuilding"
-        :flats="buildingFlats"
+        :flats="selectedBuildingFlats"
         :selected-flat-id="selectedFlat?.id"
         :is-open="!!selectedBuilding && !showPolygonSidebar"
         @close="clearBuildingSelection"
@@ -89,7 +89,7 @@
 
     <FavoritesModal
       :open="showFavorites"
-      :favorites="favorites"
+      :favorites="cityFavorites"
       @close="showFavorites = false"
       @select="handleSelectFavorite"
       @delete="handleDeleteFavorite"
@@ -148,13 +148,15 @@ const buildingsLoading = ref(false);
 const flatsLoading = ref(false);
 const buildingsLoaded = ref(0);
 const buildingsTotal = ref(0);
+const flatsLoadedOnce = ref(false);
+const flatsLoadFailed = ref(false);
+const flatsLoadingReason = ref('filters');
 
 const filters = ref(loadFilters());
 const favorites = ref(loadFavorites());
 const favoritesSynced = ref(false);
 
 const selectedBuilding = ref(null);
-const buildingFlats = ref([]);
 const selectedFlat = ref(null);
 
 const showDetailModal = ref(false);
@@ -213,21 +215,48 @@ const displayFlats = computed(() => {
 });
 
 const displayBuildings = computed(() => {
-  const counts = new Map();
+  const countsByBuildingId = new Map();
+  const countsByCoord = new Map();
   displayFlats.value.forEach((flat) => {
+    if (flat.buildingId) {
+      countsByBuildingId.set(flat.buildingId, (countsByBuildingId.get(flat.buildingId) || 0) + 1);
+      return;
+    }
     if (!flat.coordKey) return;
-    counts.set(flat.coordKey, (counts.get(flat.coordKey) || 0) + 1);
+    countsByCoord.set(flat.coordKey, (countsByCoord.get(flat.coordKey) || 0) + 1);
   });
 
-  const hasFlats = displayFlats.value.length > 0;
+  const canUseFlatsForCounts = flatsLoadedOnce.value && !flatsLoadFailed.value;
 
   return buildings.value
     .map((building) => ({
       ...building,
-      flatCount: hasFlats ? counts.get(building.coordKey) || 0 : building.flatCount || 0,
+      flatCount: canUseFlatsForCounts
+        ? (countsByBuildingId.get(building.id) ?? countsByCoord.get(building.coordKey) ?? 0)
+        : building.flatCount || 0,
     }))
     .filter((building) => building.flatCount > 0);
 });
+
+const selectedBuildingFlats = computed(() => {
+  if (!selectedBuilding.value) return [];
+  if (!flatsLoadedOnce.value || flatsLoadFailed.value) return [];
+
+  const selectedId = selectedBuilding.value.id;
+  if (selectedId) {
+    const byId = displayFlats.value.filter((flat) => flat.buildingId === selectedId);
+    if (byId.length) return byId;
+  }
+  const selectedCoordKey = selectedBuilding.value.coordKey;
+  if (!selectedCoordKey) return [];
+  return displayFlats.value.filter((flat) => flat.coordKey === selectedCoordKey);
+});
+
+const cityFavorites = computed(() =>
+  favorites.value.filter(
+    (favorite) => favorite.cityId && favorite.cityId === selectedCity.value?.id
+  )
+);
 
 const heatPoints = computed(() => {
   if (!heatMode.value || !heatData.value.length) return [];
@@ -245,7 +274,7 @@ const heatPoints = computed(() => {
 const isMapLoading = computed(() => buildingsLoading.value || flatsLoading.value);
 const loadingPhase = computed(() => {
   if (buildingsLoading.value) return 'buildings';
-  if (flatsLoading.value) return 'flats';
+  if (flatsLoading.value) return flatsLoadingReason.value;
   return null;
 });
 const loadingPercent = computed(() => {
@@ -339,13 +368,16 @@ async function loadBuildings() {
   }
 }
 
-async function loadFlats() {
+async function loadFlats(reason = 'filters') {
   flats.value = [];
   flatsLoading.value = true;
+  flatsLoadingReason.value = reason;
+  flatsLoadFailed.value = false;
 
   const payload = buildFilterPayload();
   if (!payload) {
     flatsLoading.value = false;
+    flatsLoadFailed.value = true;
     return;
   }
 
@@ -353,8 +385,10 @@ async function loadFlats() {
     const { data } = await mapApi.searchFlats(payload);
     const list = data || [];
     flats.value = list.map((flat) => normalizeFlat(flat));
+    flatsLoadedOnce.value = true;
   } catch (error) {
     console.error(error);
+    flatsLoadFailed.value = true;
     toast.add({
       severity: 'error',
       summary: 'Карта',
@@ -363,25 +397,6 @@ async function loadFlats() {
     });
   } finally {
     flatsLoading.value = false;
-  }
-}
-
-async function loadBuildingFlats(building) {
-  if (!building || !selectedCity.value?.id) return;
-
-  try {
-    const { data } = await mapApi.getBuildingFlats(selectedCity.value.id, building.id);
-    const list = data || [];
-    const normalized = list.map((flat) => normalizeFlat(flat, building));
-    buildingFlats.value = applyFiltersToFlats(normalized, filters.value);
-  } catch (error) {
-    console.error(error);
-    toast.add({
-      severity: 'error',
-      summary: 'Здание',
-      detail: 'Не удалось загрузить квартиры по дому.',
-      life: 3000,
-    });
   }
 }
 
@@ -449,12 +464,10 @@ function handleBuildingClick(building) {
   selectedBuilding.value = building;
   showPolygonSidebar.value = false;
   selectedFlat.value = null;
-  loadBuildingFlats(building);
 }
 
 function clearBuildingSelection() {
   selectedBuilding.value = null;
-  buildingFlats.value = [];
   selectedFlat.value = null;
 }
 
@@ -490,9 +503,6 @@ function handleApplyFilters(nextFilters) {
   filters.value = { ...DEFAULT_FILTERS, ...nextFilters };
   saveFilters(filters.value);
   loadFlats();
-  if (selectedBuilding.value) {
-    loadBuildingFlats(selectedBuilding.value);
-  }
 }
 
 function handleSaveFilters(nextFilters) {
@@ -501,6 +511,7 @@ function handleSaveFilters(nextFilters) {
     name: `Конфигурация ${favorites.value.length + 1}`,
     filters: { ...nextFilters },
     geoPoints: activePolygon.value || [],
+    cityId: selectedCity.value?.id || null,
     source: 'local',
   };
   favorites.value = [favorite, ...favorites.value];
@@ -536,7 +547,7 @@ function finishPolygon() {
   polygonPoints.value = [];
   isDrawing.value = false;
   showPolygonSidebar.value = true;
-  loadFlats();
+  loadFlats('polygon');
 }
 
 function closePolygonSidebar() {
@@ -553,6 +564,7 @@ async function handleSavePolygon(name) {
     name,
     filters: { ...filters.value },
     geoPoints: [...activePolygon.value],
+    cityId: selectedCity.value?.id || null,
     source: 'local',
   };
 
@@ -582,8 +594,10 @@ function handleSelectFavorite(favorite) {
     activePolygon.value = null;
     showPolygonSidebar.value = false;
   }
+  selectedBuilding.value = null;
+  selectedFlat.value = null;
   showFavorites.value = false;
-  loadFlats();
+  loadFlats('polygon');
 }
 
 async function handleDeleteFavorite(favorite) {
@@ -626,6 +640,7 @@ async function syncFavorites() {
           id: item.id || item.Id,
           name: 'Полигон',
           geoPoints: item.GeoPoints || item.geoPoints,
+          cityId: item.CityId || item.cityId || null,
           source: 'server',
           serverId: item.id || item.Id,
         })
@@ -652,7 +667,6 @@ async function syncFavorites() {
 
 function resetMapState() {
   selectedBuilding.value = null;
-  buildingFlats.value = [];
   selectedFlat.value = null;
   activePolygon.value = null;
   polygonPoints.value = [];

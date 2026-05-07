@@ -53,8 +53,12 @@ const sourceLabel = computed(() => {
     cian: 'Циан',
     domclick: 'Домклик',
     avito: 'Авито',
+    unknown: 'Источник',
   };
-  return map[props.flat.source] || props.flat.source || 'Источник';
+  const source = String(props.flat.source || '')
+    .trim()
+    .toLowerCase();
+  return map[source] || props.flat.source || 'Источник';
 });
 </script>
 

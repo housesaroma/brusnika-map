@@ -19,6 +19,16 @@ export function normalizeBuilding(building) {
 export function normalizeFlat(flat, buildingMeta = {}) {
   const coordsRaw = flat.coords || flat.Coords || flat.GeoPoint || flat.geoPoint || '';
   const coordKey = normalizeCoordKey(coordsRaw);
+  const source =
+    flat.Source ||
+    flat.source ||
+    flat.SourceName ||
+    flat.sourceName ||
+    flat.Parser ||
+    flat.parser ||
+    flat.Platform ||
+    flat.platform ||
+    '';
   return {
     id: flat.Id || flat.id,
     area: Number(flat.area ?? flat.Area ?? 0),
@@ -26,7 +36,7 @@ export function normalizeFlat(flat, buildingMeta = {}) {
     floor: Number(flat.floor ?? flat.Floor ?? 0),
     price: Number(flat.Price ?? flat.price ?? 0),
     sqm: Number(flat.SQM ?? flat.sqm ?? flat.PricePerSqm ?? 0),
-    source: flat.Source || flat.source || 'unknown',
+    source,
     pictureUrl: flat.PictureUrl || flat.pictureUrl || '',
     coords: coordsRaw,
     center: parseCoordsToLngLat(coordsRaw),

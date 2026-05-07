@@ -29,6 +29,7 @@
       v-else-if="canRenderMap"
       v-model="map"
       class="map-canvas__map"
+      :class="{ 'map-canvas__map--drawing': isDrawing }"
       :settings="mapSettings"
       width="100%"
       height="100%"
@@ -40,7 +41,12 @@
 
         <HeatmapLayer v-if="heatMode" :points="heatPoints" />
 
-        <YandexMapClusterer zoom-on-cluster-click :grid-size="64" :settings="{ maxZoom: 17 }">
+        <YandexMapClusterer
+          v-if="!isDrawing"
+          zoom-on-cluster-click
+          :grid-size="64"
+          :settings="{ maxZoom: 17 }"
+        >
           <YandexMapMarker
             v-for="building in visibleBuildings"
             :key="building.id"
@@ -58,13 +64,28 @@
           </template>
         </YandexMapClusterer>
 
+        <template v-else>
+          <YandexMapMarker
+            v-for="building in visibleBuildings"
+            :key="building.id"
+            :container-attrs="{ style: { pointerEvents: 'none' } }"
+            :settings="{ coordinates: building.center }"
+          >
+            <div class="building-dot building-dot--disabled">
+              <i class="pi pi-building"></i>
+              <span>{{ building.flatCount || 0 }}</span>
+            </div>
+          </YandexMapMarker>
+        </template>
+
         <YandexMapMarker
           v-for="flat in analogFlats"
           :key="flat.id"
           position="top left-center"
+          :container-attrs="isDrawing ? { style: { pointerEvents: 'none' } } : undefined"
           :settings="{ coordinates: flat.center }"
         >
-          <div class="analog-marker"></div>
+          <div class="analog-marker" :class="{ 'analog-marker--disabled': isDrawing }"></div>
         </YandexMapMarker>
 
         <YandexMapFeature v-if="savedFeature" :settings="savedFeature" />
@@ -241,6 +262,7 @@ const visibleBuildings = computed(() =>
 );
 const loadingTitle = computed(() => {
   if (props.loadingPhase === 'buildings') return 'Загружаем объекты карты...';
+  if (props.loadingPhase === 'polygon') return 'Применяем полигон...';
   if (props.loadingPhase === 'flats') return 'Применяем фильтры квартир...';
   return 'Загрузка объектов...';
 });
@@ -258,10 +280,9 @@ const listenerSettings = {
     const zoom = event?.location?.zoom;
     if (Number.isFinite(zoom)) currentZoom.value = Math.round(zoom);
   },
-  onClick: (event) => {
+  onClick: (object, event) => {
     if (!props.isDrawing) return;
-    if (Date.now() - props.drawingEnabledAt < 300) return;
-    const coords = extractCoordinates(event);
+    const coords = extractCoordinates(event) || extractCoordinates(object);
     if (coords) {
       emit('add-point', coords);
     }
@@ -272,6 +293,10 @@ function extractCoordinates(event) {
   if (Array.isArray(event?.coordinates)) return event.coordinates;
   if (Array.isArray(event?.location?.coordinates)) return event.location.coordinates;
   if (Array.isArray(event?.lngLat)) return event.lngLat;
+  if (Array.isArray(event?.object?.coordinates)) return event.object.coordinates;
+  if (Array.isArray(event?.detail?.coordinates)) return event.detail.coordinates;
+  if (Array.isArray(event?.sourceEvent?.coordinates)) return event.sourceEvent.coordinates;
+  if (Array.isArray(event?.data?.coordinates)) return event.data.coordinates;
   return null;
 }
 
@@ -389,6 +414,10 @@ function buildPolygonFeature(points, strokeColor, fillColor) {
   height: 100%;
 }
 
+.map-canvas__map--drawing {
+  cursor: crosshair;
+}
+
 .map-canvas__no-key {
   height: 100%;
   display: flex;
@@ -453,6 +482,12 @@ code {
   font-weight: 700;
   box-shadow: 0 8px 18px rgba(255, 0, 30, 0.4);
   transform: translate(-50%, -100%);
+}
+
+.building-dot--disabled,
+.cluster-marker--disabled,
+.analog-marker--disabled {
+  pointer-events: none;
 }
 
 .analog-marker {

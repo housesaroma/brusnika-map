@@ -11,6 +11,7 @@ export function normalizeFavorite(raw) {
       : parseGeoPointString(raw.geoPoints || raw.GeoPoints || ''),
     source: raw.source || 'local',
     serverId: raw.serverId || raw.id || null,
+    cityId: raw.cityId || raw.CityId || null,
   };
 }
 
@@ -23,6 +24,7 @@ export function serializeFavorite(favorite) {
     geoPoints: favorite.geoPoints,
     source: favorite.source,
     serverId: favorite.serverId,
+    cityId: favorite.cityId || null,
   };
 }
 
@@ -30,5 +32,6 @@ export function favoriteToServerPayload(favorite) {
   return {
     color: '#ff001e',
     GeoPoints: serializeGeoPoints(favorite.geoPoints || []),
+    CityId: favorite.cityId || null,
   };
 }
