@@ -1,5 +1,22 @@
 <template>
   <div class="map-canvas">
+    <div v-if="loading" class="map-canvas__loading">
+      <div class="map-canvas__spinner"></div>
+      <span class="map-canvas__loading-title">{{ loadingTitle }}</span>
+      <span
+        v-if="loadingPhase === 'buildings' && loadingTotal > 0"
+        class="map-canvas__loading-subtitle"
+      >
+        {{ loadingLoaded }} / {{ loadingTotal }}
+      </span>
+      <div
+        v-if="loadingPhase === 'buildings' && Number.isFinite(loadingPercent)"
+        class="map-canvas__progress"
+      >
+        <div class="map-canvas__progress-fill" :style="{ width: `${loadingPercent}%` }"></div>
+      </div>
+    </div>
+
     <div v-if="!hasApiKey" class="map-canvas__no-key">
       <i class="pi pi-exclamation-triangle map-canvas__no-key-icon"></i>
       <p class="map-canvas__no-key-title">API ключ Яндекс Карт не задан</p>
@@ -89,6 +106,26 @@ const props = defineProps({
   zoom: {
     type: Number,
     default: 12,
+  },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
+  loadingPhase: {
+    type: String,
+    default: null,
+  },
+  loadingPercent: {
+    type: Number,
+    default: null,
+  },
+  loadingLoaded: {
+    type: Number,
+    default: 0,
+  },
+  loadingTotal: {
+    type: Number,
+    default: 0,
   },
   buildings: {
     type: Array,
@@ -202,6 +239,11 @@ watchEffect(() => {
 const visibleBuildings = computed(() =>
   props.buildings.filter((building) => isValidCenter(building.center))
 );
+const loadingTitle = computed(() => {
+  if (props.loadingPhase === 'buildings') return 'Загружаем объекты карты...';
+  if (props.loadingPhase === 'flats') return 'Применяем фильтры квартир...';
+  return 'Загрузка объектов...';
+});
 
 const drawingFeature = computed(() =>
   buildPolygonFeature(props.polygonPoints, '#ff001e', 'rgba(255, 0, 30, 0.15)')
@@ -285,6 +327,61 @@ function buildPolygonFeature(points, strokeColor, fillColor) {
   border-radius: var(--app-radius-lg);
   overflow: hidden;
   background: var(--app-card);
+}
+
+.map-canvas__loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(2px);
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.map-canvas__loading-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.map-canvas__loading-subtitle {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.map-canvas__spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(15, 23, 42, 0.2);
+  border-top-color: #ff001e;
+  animation: map-spin 0.8s linear infinite;
+}
+
+.map-canvas__progress {
+  width: min(280px, 70%);
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.15);
+  overflow: hidden;
+}
+
+.map-canvas__progress-fill {
+  height: 100%;
+  background: #ff001e;
+  transition: width 0.2s ease;
+}
+
+@keyframes map-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .map-canvas__map {

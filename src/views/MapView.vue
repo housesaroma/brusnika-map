@@ -1,7 +1,7 @@
 <template>
   <div class="map-screen">
     <LeftNavPanel
-      :total-flats="displayFlats.length"
+      :total-flats="displayBuildings.length"
       :has-active-filters="hasFilters"
       :heat-mode="heatMode"
       :heatmap-options="heatmapOptions"
@@ -19,6 +19,11 @@
       <MapCanvas
         :center="selectedCity?.center"
         :zoom="12"
+        :loading="isMapLoading"
+        :loading-phase="loadingPhase"
+        :loading-percent="loadingPercent"
+        :loading-loaded="buildingsLoaded"
+        :loading-total="buildingsTotal"
         :buildings="displayBuildings"
         :selected-building-id="selectedBuilding?.id || null"
         :analog-flats="[]"
@@ -139,6 +144,10 @@ if (savedCity?.id) {
 
 const buildings = ref([]);
 const flats = ref([]);
+const buildingsLoading = ref(false);
+const flatsLoading = ref(false);
+const buildingsLoaded = ref(0);
+const buildingsTotal = ref(0);
 
 const filters = ref(loadFilters());
 const favorites = ref(loadFavorites());
@@ -233,6 +242,19 @@ const heatPoints = computed(() => {
     .filter((point) => Array.isArray(point.coordinates));
 });
 
+const isMapLoading = computed(() => buildingsLoading.value || flatsLoading.value);
+const loadingPhase = computed(() => {
+  if (buildingsLoading.value) return 'buildings';
+  if (flatsLoading.value) return 'flats';
+  return null;
+});
+const loadingPercent = computed(() => {
+  if (!buildingsLoading.value) return null;
+  if (!Number.isFinite(buildingsTotal.value) || buildingsTotal.value <= 0) return null;
+  const ratio = (buildingsLoaded.value / buildingsTotal.value) * 100;
+  return Math.max(0, Math.min(100, Math.round(ratio)));
+});
+
 watch(showFavorites, (value) => {
   if (value) {
     syncFavorites();
@@ -278,6 +300,9 @@ async function loadCityData() {
 
 async function loadBuildings() {
   buildings.value = [];
+  buildingsLoading.value = true;
+  buildingsLoaded.value = 0;
+  buildingsTotal.value = 0;
 
   try {
     const pageSize = 200;
@@ -289,7 +314,9 @@ async function loadBuildings() {
       const { data } = await mapApi.getBuildings(selectedCity.value.id, { page, pageSize });
       const list = data.Buildings || data.buildings || [];
       total = data.Amount || data.amount || list.length;
+      buildingsTotal.value = Number(total) || nextBuildings.length + list.length;
       nextBuildings.push(...list.map(normalizeBuilding));
+      buildingsLoaded.value = nextBuildings.length;
       page += 1;
       if (!list.length) break;
     } while (nextBuildings.length < total);
@@ -304,14 +331,23 @@ async function loadBuildings() {
       detail: 'Не удалось загрузить здания.',
       life: 3000,
     });
+  } finally {
+    if (buildingsTotal.value > 0) {
+      buildingsLoaded.value = Math.min(buildingsLoaded.value, buildingsTotal.value);
+    }
+    buildingsLoading.value = false;
   }
 }
 
 async function loadFlats() {
   flats.value = [];
+  flatsLoading.value = true;
 
   const payload = buildFilterPayload();
-  if (!payload) return;
+  if (!payload) {
+    flatsLoading.value = false;
+    return;
+  }
 
   try {
     const { data } = await mapApi.searchFlats(payload);
@@ -325,6 +361,8 @@ async function loadFlats() {
       detail: 'Не удалось загрузить квартиры.',
       life: 3000,
     });
+  } finally {
+    flatsLoading.value = false;
   }
 }
 
