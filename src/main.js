@@ -9,6 +9,7 @@ import App from './App.vue';
 import router from './router';
 
 import 'vue-yandex-maps/css';
+import 'primeicons/primeicons.css';
 import './style.css';
 
 const app = createApp(App);

@@ -9,7 +9,7 @@
     </div>
 
     <YandexMap
-      v-else
+      v-else-if="canRenderMap"
       v-model="map"
       class="map-canvas__map"
       :settings="mapSettings"
@@ -18,36 +18,41 @@
     >
       <YandexMapDefaultSchemeLayer />
       <YandexMapDefaultFeaturesLayer />
-      <YandexMapListener :settings="listenerSettings" />
+      <template v-if="mapReady">
+        <YandexMapListener :settings="listenerSettings" />
 
-      <HeatmapLayer v-if="heatMode" :points="heatPoints" />
+        <HeatmapLayer v-if="heatMode" :points="heatPoints" />
 
-      <YandexMapMarker
-        v-for="building in visibleBuildings"
-        :key="building.id"
-        :settings="{ coordinates: building.center }"
-      >
-        <button
-          type="button"
-          class="building-marker"
-          :class="{ 'building-marker--active': building.id === selectedBuildingId }"
-          @click.stop="() => emit('building-click', building)"
+        <YandexMapClusterer zoom-on-cluster-click :grid-size="64" :settings="{ maxZoom: 17 }">
+          <YandexMapMarker
+            v-for="building in visibleBuildings"
+            :key="building.id"
+            :settings="{ coordinates: building.center }"
+            @click="emit('building-click', building)"
+          >
+            <div class="building-dot">
+              <i class="pi pi-building"></i>
+              <span>{{ building.flatCount || 0 }}</span>
+            </div>
+          </YandexMapMarker>
+
+          <template #cluster="{ length }">
+            <div class="cluster-marker">{{ length }}</div>
+          </template>
+        </YandexMapClusterer>
+
+        <YandexMapMarker
+          v-for="flat in analogFlats"
+          :key="flat.id"
+          position="top left-center"
+          :settings="{ coordinates: flat.center }"
         >
-          <i class="pi pi-building building-marker__icon"></i>
-          <span>{{ building.flatCount }}</span>
-        </button>
-      </YandexMapMarker>
+          <div class="analog-marker"></div>
+        </YandexMapMarker>
 
-      <YandexMapMarker
-        v-for="flat in analogFlats"
-        :key="flat.id"
-        :settings="{ coordinates: flat.center }"
-      >
-        <div class="analog-marker"></div>
-      </YandexMapMarker>
-
-      <YandexMapFeature v-if="savedFeature" :settings="savedFeature" />
-      <YandexMapFeature v-if="drawingFeature" :settings="drawingFeature" />
+        <YandexMapFeature v-if="savedFeature" :settings="savedFeature" />
+        <YandexMapFeature v-if="drawingFeature" :settings="drawingFeature" />
+      </template>
     </YandexMap>
 
     <FloatControls
@@ -62,11 +67,12 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, shallowRef, watch, watchEffect } from 'vue';
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
   YandexMapDefaultFeaturesLayer,
+  YandexMapClusterer,
   YandexMapListener,
   YandexMapMarker,
   YandexMapFeature,
@@ -78,7 +84,7 @@ import { isValidCenter } from '@/utils/geo';
 const props = defineProps({
   center: {
     type: Array,
-    required: true,
+    default: null,
   },
   zoom: {
     type: Number,
@@ -128,19 +134,27 @@ const props = defineProps({
 
 const emit = defineEmits(['building-click', 'add-point', 'favorites', 'toggle-drawing']);
 
-const map = ref(null);
+// vue-yandex-maps expects v-model value to be stored in shallowRef
+const map = shallowRef(null);
 const hasApiKey = computed(() => Boolean(import.meta.env.VITE_YANDEX_MAPS_API_KEY));
+const canRenderMap = computed(() => hasApiKey.value && isValidCenter(safeCenter.value));
+const mapReady = computed(() => Boolean(map.value));
 const fallbackCenter = [37.617635, 55.755814];
 const mapLocation = ref({
   center: isValidCenter(props.center) ? props.center : fallbackCenter,
   zoom: props.zoom,
 });
+// Zoom value for UI controls.
+// We keep it separate to avoid re-render loops triggered by `YandexMapListener.onUpdate`.
+const currentZoom = ref(props.zoom);
 
 watch(
   () => props.center,
   (next) => {
     if (isValidCenter(next)) {
       mapLocation.value = { ...mapLocation.value, center: next };
+    } else if (!isValidCenter(mapLocation.value.center)) {
+      mapLocation.value = { ...mapLocation.value, center: fallbackCenter };
     }
   }
 );
@@ -153,10 +167,37 @@ watch(
   }
 );
 
-const mapSettings = computed(() => ({
-  location: mapLocation.value,
-  zoomRange: [3, 20],
-}));
+const safeCenter = computed(() => {
+  const center = isValidCenter(mapLocation.value.center)
+    ? mapLocation.value.center
+    : fallbackCenter;
+  // Ensure a plain array of finite numbers (no reactive proxies).
+  return [Number(center[0]), Number(center[1])];
+});
+
+const safeZoom = computed(() => {
+  const zoom = Number.isFinite(mapLocation.value.zoom) ? mapLocation.value.zoom : props.zoom;
+  return Number.isFinite(zoom) ? zoom : 12;
+});
+
+const mapSettings = shallowRef({
+  location: { center: fallbackCenter, zoom: 12 },
+  zoomRange: { min: 3, max: 20 },
+});
+
+watchEffect(() => {
+  if (!isValidCenter(safeCenter.value)) {
+    console.error('[MapCanvas] Invalid center', {
+      propsCenter: props.center,
+      mapLocation: mapLocation.value,
+      safeCenter: safeCenter.value,
+    });
+  }
+  mapSettings.value = {
+    location: { center: safeCenter.value, zoom: safeZoom.value },
+    zoomRange: { min: 3, max: 20 },
+  };
+});
 
 const visibleBuildings = computed(() =>
   props.buildings.filter((building) => isValidCenter(building.center))
@@ -173,12 +214,7 @@ const savedFeature = computed(() =>
 const listenerSettings = {
   onUpdate: (event) => {
     const zoom = event?.location?.zoom;
-    if (Number.isFinite(zoom)) {
-      mapLocation.value = {
-        ...mapLocation.value,
-        zoom: Math.round(zoom),
-      };
-    }
+    if (Number.isFinite(zoom)) currentZoom.value = Math.round(zoom);
   },
   onClick: (event) => {
     if (!props.isDrawing) return;
@@ -198,22 +234,24 @@ function extractCoordinates(event) {
 }
 
 function flyTo(center, zoom) {
+  if (!isValidCenter(center)) return;
   mapLocation.value = {
     center,
     zoom,
   };
+  currentZoom.value = zoom;
   if (map.value?.setLocation) {
     map.value.setLocation({ center, zoom, duration: 1000 });
   }
 }
 
 function handleZoomIn() {
-  const nextZoom = Math.min(20, (mapLocation.value.zoom || 12) + 1);
+  const nextZoom = Math.min(20, (currentZoom.value || mapLocation.value.zoom || 12) + 1);
   flyTo(mapLocation.value.center, nextZoom);
 }
 
 function handleZoomOut() {
-  const nextZoom = Math.max(3, (mapLocation.value.zoom || 12) - 1);
+  const nextZoom = Math.max(3, (currentZoom.value || mapLocation.value.zoom || 12) - 1);
   flyTo(mapLocation.value.center, nextZoom);
 }
 
@@ -291,27 +329,33 @@ function buildPolygonFeature(points, strokeColor, fillColor) {
   z-index: 5;
 }
 
-.building-marker {
+code {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  background: #f1f5f9;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+}
+</style>
+
+<style>
+.building-dot {
+  min-width: 38px;
+  height: 32px;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #ff001e;
+  color: #fff;
+  border: 2px solid #fff;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  background: var(--app-primary);
-  color: var(--app-primary-contrast);
-  border: 2px solid #ffffff;
-  border-radius: 999px;
+  justify-content: center;
   font-size: 12px;
-  font-weight: 600;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
-  cursor: pointer;
-}
-
-.building-marker__icon {
-  font-size: 12px;
-}
-
-.building-marker--active {
-  background: #1e293b;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(255, 0, 30, 0.4);
+  transform: translate(-50%, -100%);
 }
 
 .analog-marker {
@@ -324,12 +368,20 @@ function buildPolygonFeature(points, strokeColor, fillColor) {
   transform: translate(-50%, -50%);
 }
 
-code {
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-    monospace;
-  background: #f1f5f9;
-  padding: 0 0.25rem;
-  border-radius: 4px;
+.cluster-marker {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #7f1d1d;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 8px 20px rgba(127, 29, 29, 0.45);
+  transform: translate(-50%, -50%);
+  cursor: pointer;
 }
 </style>

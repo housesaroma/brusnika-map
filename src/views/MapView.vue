@@ -210,10 +210,12 @@ const displayBuildings = computed(() => {
     counts.set(flat.coordKey, (counts.get(flat.coordKey) || 0) + 1);
   });
 
+  const hasFlats = displayFlats.value.length > 0;
+
   return buildings.value
     .map((building) => ({
       ...building,
-      flatCount: counts.get(building.coordKey) || 0,
+      flatCount: hasFlats ? counts.get(building.coordKey) || 0 : building.flatCount || 0,
     }))
     .filter((building) => building.flatCount > 0);
 });
@@ -281,15 +283,19 @@ async function loadBuildings() {
     const pageSize = 200;
     let page = 1;
     let total = 0;
+    const nextBuildings = [];
 
     do {
       const { data } = await mapApi.getBuildings(selectedCity.value.id, { page, pageSize });
       const list = data.Buildings || data.buildings || [];
       total = data.Amount || data.amount || list.length;
-      buildings.value.push(...list.map(normalizeBuilding));
+      nextBuildings.push(...list.map(normalizeBuilding));
       page += 1;
       if (!list.length) break;
-    } while (buildings.value.length < total);
+    } while (nextBuildings.length < total);
+
+    // Important: assign once to avoid massive child-patching while map initializes.
+    buildings.value = nextBuildings;
   } catch (error) {
     console.error(error);
     toast.add({
@@ -428,9 +434,12 @@ async function fetchPrediction(flatId) {
   try {
     const { data } = await predictionsApi.getFlatPrediction(flatId);
     prediction.value = {
-      predictedPrice: data.PredictedPrice,
-      deviationPercent: data.DeviationPercent,
-      similarFlats: data.SimilarFlats,
+      predictedPrice: data.predictedPrice ?? data.PredictedPrice,
+      deviationPercent: data.deviationPercent ?? data.DeviationPercent,
+      actualPrice: data.actualPrice ?? data.ActualPrice,
+      status: data.status ?? data.Status,
+      recommendation: data.recommendation ?? data.Recommendation,
+      confidence: data.confidence ?? data.Confidence,
     };
   } catch (error) {
     console.error(error);
