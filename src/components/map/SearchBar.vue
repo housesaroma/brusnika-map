@@ -1,11 +1,16 @@
 <template>
   <div class="search-bar">
     <i class="pi pi-search search-bar__icon"></i>
-    <InputText
+    <AutoComplete
       v-model="query"
+      :suggestions="suggestions"
+      option-label="label"
+      append-to="self"
+      :force-selection="false"
       class="search-bar__input"
-      type="text"
       placeholder="Поиск адреса или объекта..."
+      @complete="handleSuggest"
+      @item-select="handleSuggestionSelect"
       @keydown.enter="handleSearch"
     />
     <Button
@@ -19,10 +24,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import InputText from 'primevue/inputtext';
+import { onBeforeUnmount, ref } from 'vue';
+import AutoComplete from 'primevue/autocomplete';
 import Button from 'primevue/button';
-import { geocodeAddress } from '@/api/geocoder';
+import { geocodeAddress, suggestAddresses } from '@/api/geocoder';
 import { useToast } from 'primevue/usetoast';
 
 const props = defineProps({
@@ -37,9 +42,50 @@ const emit = defineEmits(['search']);
 const toast = useToast();
 const query = ref('');
 const loading = ref(false);
+const suggestions = ref([]);
+let suggestTimer = null;
+
+onBeforeUnmount(() => {
+  if (suggestTimer) {
+    clearTimeout(suggestTimer);
+    suggestTimer = null;
+  }
+});
+
+async function handleSuggest(event) {
+  const value = String(event?.query || '').trim();
+  if (!value) {
+    suggestions.value = [];
+    return;
+  }
+
+  if (suggestTimer) {
+    clearTimeout(suggestTimer);
+  }
+
+  suggestTimer = setTimeout(async () => {
+    try {
+      suggestions.value = await suggestAddresses(value, { cityLabel: props.cityLabel, limit: 8 });
+    } catch {
+      suggestions.value = [];
+    }
+  }, 300);
+}
+
+function handleSuggestionSelect(event) {
+  const selected = event?.value;
+  if (!selected?.coordinates) return;
+  emit('search', selected);
+}
 
 async function handleSearch() {
-  if (!query.value.trim()) return;
+  if (!String(query.value || '').trim()) return;
+
+  if (typeof query.value === 'object' && query.value?.coordinates) {
+    emit('search', query.value);
+    return;
+  }
+
   loading.value = true;
 
   try {
@@ -94,14 +140,25 @@ async function handleSearch() {
 
 .search-bar__input {
   flex: 1;
+  position: relative;
+}
+
+.search-bar__input :deep(.p-inputtext) {
+  width: 100%;
   border: none;
   box-shadow: none;
   font-size: 0.875rem;
   padding: 0.35rem 0;
 }
 
-.search-bar__input:focus {
+.search-bar__input :deep(.p-inputtext:focus) {
   box-shadow: none;
+}
+
+.search-bar__input :deep(.p-autocomplete-overlay) {
+  left: 0 !important;
+  right: 0;
+  width: 100%;
 }
 
 .search-bar__button {
