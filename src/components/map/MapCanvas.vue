@@ -1,19 +1,31 @@
 <template>
   <div class="map-canvas">
     <div v-if="loading" class="map-canvas__loading">
-      <div class="map-canvas__spinner"></div>
+      <div class="map-canvas__house-loader" aria-hidden="true">
+        <div class="map-canvas__house">
+          <div class="map-canvas__house-smoke"></div>
+          <div class="map-canvas__house-chimney"></div>
+          <div class="map-canvas__house-roof"></div>
+          <div class="map-canvas__house-body">
+            <div class="map-canvas__house-window"></div>
+            <div class="map-canvas__house-window"></div>
+            <div class="map-canvas__house-door"></div>
+          </div>
+        </div>
+        <div class="map-canvas__house-shadow"></div>
+      </div>
       <span class="map-canvas__loading-title">{{ loadingTitle }}</span>
       <span
-        v-if="loadingPhase === 'buildings' && loadingTotal > 0"
+        v-if="loadingPhase === 'buildings' && Number.isFinite(targetPercent)"
         class="map-canvas__loading-subtitle"
       >
-        {{ loadingLoaded }} / {{ loadingTotal }}
+        {{ Math.round(displayPercent) }}%
       </span>
       <div
-        v-if="loadingPhase === 'buildings' && Number.isFinite(loadingPercent)"
+        v-if="loadingPhase === 'buildings' && Number.isFinite(targetPercent)"
         class="map-canvas__progress"
       >
-        <div class="map-canvas__progress-fill" :style="{ width: `${loadingPercent}%` }"></div>
+        <div class="map-canvas__progress-fill" :style="{ width: `${displayPercent}%` }"></div>
       </div>
     </div>
 
@@ -105,7 +117,7 @@
 </template>
 
 <script setup>
-import { computed, ref, shallowRef, watch, watchEffect } from 'vue';
+import { computed, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from 'vue';
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
@@ -267,6 +279,74 @@ const loadingTitle = computed(() => {
   return 'Загрузка объектов...';
 });
 
+const targetPercent = computed(() => {
+  if (!Number.isFinite(props.loadingPercent)) return null;
+  return Math.max(0, Math.min(100, Number(props.loadingPercent)));
+});
+
+const displayPercent = ref(0);
+let progressRaf = 0;
+
+function stopProgressAnimation() {
+  if (progressRaf) {
+    cancelAnimationFrame(progressRaf);
+    progressRaf = 0;
+  }
+}
+
+function animateProgressToTarget() {
+  stopProgressAnimation();
+
+  const step = () => {
+    const target = Number.isFinite(targetPercent.value) ? targetPercent.value : 0;
+    const current = Number.isFinite(displayPercent.value) ? displayPercent.value : 0;
+    const diff = target - current;
+
+    // Snap for tiny diffs to avoid endless rAF loops.
+    if (Math.abs(diff) < 0.2) {
+      displayPercent.value = target;
+      progressRaf = 0;
+      return;
+    }
+
+    // Ease-out: quickly catches up but still looks smooth for big jumps.
+    displayPercent.value = Math.max(0, Math.min(100, current + diff * 0.14));
+    progressRaf = requestAnimationFrame(step);
+  };
+
+  progressRaf = requestAnimationFrame(step);
+}
+
+watch(
+  () => [props.loading, props.loadingPhase],
+  ([isLoading, phase]) => {
+    if (!isLoading) {
+      stopProgressAnimation();
+      return;
+    }
+    if (phase === 'buildings') {
+      // Reset visual progress when a fresh buildings load starts.
+      if (!Number.isFinite(displayPercent.value) || displayPercent.value <= 0.5) {
+        displayPercent.value = 0;
+      }
+      animateProgressToTarget();
+    }
+  }
+);
+
+watch(
+  () => targetPercent.value,
+  () => {
+    if (!props.loading) return;
+    if (props.loadingPhase !== 'buildings') return;
+    animateProgressToTarget();
+  }
+);
+
+onBeforeUnmount(() => {
+  stopProgressAnimation();
+});
+
 const drawingFeature = computed(() =>
   buildPolygonFeature(props.polygonPoints, '#ff001e', 'rgba(255, 0, 30, 0.15)')
 );
@@ -380,13 +460,192 @@ function buildPolygonFeature(points, strokeColor, fillColor) {
   opacity: 0.8;
 }
 
-.map-canvas__spinner {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 3px solid rgba(15, 23, 42, 0.2);
-  border-top-color: #ff001e;
-  animation: map-spin 0.8s linear infinite;
+.map-canvas__house-loader {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+}
+
+.map-canvas__house {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  transform: translateZ(0);
+}
+
+.map-canvas__house-chimney {
+  position: absolute;
+  right: 20px;
+  top: 10px;
+  width: 12px;
+  height: 16px;
+  border-radius: 6px 6px 4px 4px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.08));
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
+}
+
+.map-canvas__house-smoke {
+  position: absolute;
+  right: 19px;
+  top: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0) 70%);
+  filter: blur(0.2px);
+  opacity: 0.55;
+  animation: house-smoke 1.6s ease-in-out infinite;
+}
+
+.map-canvas__house-roof {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 34px solid transparent;
+  border-right: 34px solid transparent;
+  border-bottom: 28px solid #ff001e;
+  filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.12));
+  transform-origin: 50% 100%;
+  animation: house-roof-pop 1.4s ease-in-out infinite;
+}
+
+.map-canvas__house-roof::after {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: 10px;
+  width: 56px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.28),
+    rgba(255, 255, 255, 0)
+  );
+  transform: rotate(-12deg);
+  opacity: 0.6;
+  animation: house-roof-shine 1.4s ease-in-out infinite;
+}
+
+.map-canvas__house-body {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 58px;
+  height: 42px;
+  transform: translateX(-50%);
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 0, 30, 0.1) 0px,
+      rgba(255, 0, 30, 0.1) 1px,
+      rgba(255, 255, 255, 0.92) 1px,
+      rgba(255, 255, 255, 0.92) 8px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(15, 23, 42, 0.06) 0px,
+      rgba(15, 23, 42, 0.06) 1px,
+      rgba(255, 255, 255, 0) 1px,
+      rgba(255, 255, 255, 0) 12px
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.9));
+  overflow: hidden;
+  box-shadow:
+    0 18px 28px rgba(15, 23, 42, 0.1),
+    0 2px 0 rgba(255, 255, 255, 0.6) inset;
+}
+
+.map-canvas__house-body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 0, 30, 0.15) 0%,
+    rgba(255, 0, 30, 0.15) 40%,
+    rgba(255, 0, 30, 0) 55%,
+    rgba(255, 0, 30, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation: house-build-scan 1.4s ease-in-out infinite;
+}
+
+.map-canvas__house-window {
+  position: absolute;
+  top: 12px;
+  width: 14px;
+  height: 14px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.25), rgba(59, 130, 246, 0.12));
+  border: 1px solid rgba(59, 130, 246, 0.26);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.map-canvas__house-window::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.35),
+    rgba(255, 255, 255, 0)
+  );
+  transform: translateX(-120%);
+  animation: house-window-shine 1.4s ease-in-out infinite;
+}
+
+.map-canvas__house-window:nth-child(1) {
+  left: 10px;
+}
+
+.map-canvas__house-window:nth-child(2) {
+  right: 10px;
+}
+
+.map-canvas__house-door {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 20px;
+  border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.06));
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
+}
+
+.map-canvas__house-door::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  top: 10px;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 0, 30, 0.85);
+  box-shadow: 0 0 0 2px rgba(255, 0, 30, 0.12);
+}
+
+.map-canvas__house-shadow {
+  width: 70px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.1);
+  filter: blur(1px);
+  animation: house-shadow 1.4s ease-in-out infinite;
 }
 
 .map-canvas__progress {
@@ -400,12 +659,84 @@ function buildPolygonFeature(points, strokeColor, fillColor) {
 .map-canvas__progress-fill {
   height: 100%;
   background: #ff001e;
-  transition: width 0.2s ease;
+  transition: width 0.35s ease;
 }
 
-@keyframes map-spin {
-  to {
-    transform: rotate(360deg);
+@keyframes house-build-scan {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.9;
+  }
+  55% {
+    transform: translateX(10%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(110%);
+    opacity: 0.9;
+  }
+}
+
+@keyframes house-roof-pop {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-1px) scale(1.03);
+  }
+}
+
+@keyframes house-roof-shine {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: rotate(-12deg) translateX(-2px);
+  }
+  50% {
+    opacity: 0.7;
+    transform: rotate(-12deg) translateX(2px);
+  }
+}
+
+@keyframes house-window-shine {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.25;
+  }
+  75% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+@keyframes house-smoke {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(0.95);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-8px) translateX(-4px) scale(1.1);
+    opacity: 0.65;
+  }
+}
+
+@keyframes house-shadow {
+  0%,
+  100% {
+    transform: scaleX(0.92);
+    opacity: 0.22;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 0.3;
   }
 }
 
