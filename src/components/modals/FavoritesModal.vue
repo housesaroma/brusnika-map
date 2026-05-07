@@ -15,37 +15,75 @@
       </div>
 
       <div v-else class="favorites-modal__list">
-        <div v-for="fav in favorites" :key="fav.id" class="favorite-card">
-          <div class="favorite-card__header">
-            <div v-if="editingId === fav.id" class="favorite-card__edit">
-              <InputText v-model="editingName" class="favorite-card__input" />
-              <Button icon="pi pi-check" text rounded @click="saveName(fav)" />
+        <div v-if="polygonFavorites.length" class="favorites-modal__section">
+          <h4 class="favorites-modal__section-title">Полигоны</h4>
+          <div v-for="fav in polygonFavorites" :key="fav.id" class="favorite-card">
+            <div class="favorite-card__header">
+              <div v-if="editingId === fav.id" class="favorite-card__edit">
+                <InputText v-model="editingName" class="favorite-card__input" />
+                <Button icon="pi pi-check" text rounded @click="saveName(fav)" />
+              </div>
+              <div v-else class="favorite-card__title">
+                <span>{{ fav.name }}</span>
+                <Button icon="pi pi-pencil" text rounded @click="startEdit(fav)" />
+              </div>
+              <Button
+                icon="pi pi-trash"
+                text
+                rounded
+                severity="danger"
+                @click="emit('delete', fav)"
+              />
             </div>
-            <div v-else class="favorite-card__title">
-              <span>{{ fav.name }}</span>
-              <Button icon="pi pi-pencil" text rounded @click="startEdit(fav)" />
+
+            <div class="favorite-card__tags">
+              <Tag severity="secondary">Полигон</Tag>
+              <Tag v-if="hasFilters(fav)" severity="secondary">Фильтры</Tag>
             </div>
+
             <Button
-              icon="pi pi-trash"
-              text
-              rounded
-              severity="danger"
-              @click="emit('delete', fav)"
+              label="Применить полигон"
+              outlined
+              size="small"
+              class="favorite-card__apply"
+              @click="emit('select', fav)"
             />
           </div>
+        </div>
 
-          <div class="favorite-card__tags">
-            <Tag v-if="hasPolygon(fav)" severity="secondary">Полигон</Tag>
-            <Tag v-if="hasFilters(fav)" severity="secondary">Фильтры</Tag>
+        <div v-if="filterFavorites.length" class="favorites-modal__section">
+          <h4 class="favorites-modal__section-title">Фильтры</h4>
+          <div v-for="fav in filterFavorites" :key="fav.id" class="favorite-card">
+            <div class="favorite-card__header">
+              <div v-if="editingId === fav.id" class="favorite-card__edit">
+                <InputText v-model="editingName" class="favorite-card__input" />
+                <Button icon="pi pi-check" text rounded @click="saveName(fav)" />
+              </div>
+              <div v-else class="favorite-card__title">
+                <span>{{ fav.name }}</span>
+                <Button icon="pi pi-pencil" text rounded @click="startEdit(fav)" />
+              </div>
+              <Button
+                icon="pi pi-trash"
+                text
+                rounded
+                severity="danger"
+                @click="emit('delete', fav)"
+              />
+            </div>
+
+            <div class="favorite-card__tags">
+              <Tag v-if="hasFilters(fav)" severity="secondary">Фильтры</Tag>
+            </div>
+
+            <Button
+              label="Применить фильтры"
+              outlined
+              size="small"
+              class="favorite-card__apply"
+              @click="emit('select', fav)"
+            />
           </div>
-
-          <Button
-            label="Применить"
-            outlined
-            size="small"
-            class="favorite-card__apply"
-            @click="emit('select', fav)"
-          />
         </div>
       </div>
     </div>
@@ -81,6 +119,11 @@ const visible = computed({
 
 const editingId = ref(null);
 const editingName = ref('');
+
+const polygonFavorites = computed(() => props.favorites.filter((fav) => hasPolygon(fav)));
+const filterFavorites = computed(() =>
+  props.favorites.filter((fav) => hasFilters(fav) && !hasPolygon(fav))
+);
 
 function startEdit(fav) {
   editingId.value = fav.id;
@@ -133,6 +176,19 @@ function hasFilters(fav) {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.favorites-modal__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.favorites-modal__section-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--app-muted-foreground);
 }
 
 .favorite-card {

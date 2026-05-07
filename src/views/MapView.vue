@@ -84,7 +84,6 @@
       :current-filters="filters"
       @close="showFilters = false"
       @apply="handleApplyFilters"
-      @save="handleSaveFilters"
     />
 
     <FavoritesModal
@@ -525,24 +524,6 @@ function handleApplyFilters(nextFilters) {
   loadFlats();
 }
 
-function handleSaveFilters(nextFilters) {
-  const favorite = {
-    id: `fav_${Date.now()}`,
-    name: `Конфигурация ${favorites.value.length + 1}`,
-    filters: { ...nextFilters },
-    geoPoints: activePolygon.value || [],
-    cityId: selectedCity.value?.id || null,
-    source: 'local',
-  };
-  favorites.value = [favorite, ...favorites.value];
-  toast.add({
-    severity: 'success',
-    summary: 'Избранное',
-    detail: 'Конфигурация сохранена',
-    life: 3000,
-  });
-}
-
 function toggleDrawing() {
   if (isDrawing.value) {
     isDrawing.value = false;
@@ -604,20 +585,33 @@ async function handleSavePolygon(name) {
 }
 
 function handleSelectFavorite(favorite) {
-  if (favorite.filters) {
+  const hasPolygon = Array.isArray(favorite.geoPoints) && favorite.geoPoints.length > 2;
+  const hasFilterConfig =
+    !!favorite.filters &&
+    Object.values(favorite.filters).some(
+      (value) => value !== '' && value !== null && value !== undefined
+    );
+
+  if (hasFilterConfig) {
     filters.value = { ...DEFAULT_FILTERS, ...favorite.filters };
+    saveFilters(filters.value);
   }
-  if (favorite.geoPoints?.length > 2) {
+
+  let reason = 'filters';
+
+  if (hasPolygon) {
     activePolygon.value = [...favorite.geoPoints];
     showPolygonSidebar.value = true;
+    reason = 'polygon';
   } else {
     activePolygon.value = null;
     showPolygonSidebar.value = false;
   }
+
   selectedBuilding.value = null;
   selectedFlat.value = null;
   showFavorites.value = false;
-  loadFlats('polygon');
+  loadFlats(reason);
 }
 
 async function handleDeleteFavorite(favorite) {

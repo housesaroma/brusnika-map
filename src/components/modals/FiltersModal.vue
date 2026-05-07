@@ -56,7 +56,6 @@
     <template #footer>
       <div class="filters-modal__footer">
         <Button label="Сбросить" text @click="handleReset" />
-        <Button v-if="allowSave" label="Сохранить" outlined @click="handleSave" />
         <Button label="Поиск" class="filters-modal__action" @click="handleApply" />
       </div>
     </template>
@@ -79,13 +78,9 @@ const props = defineProps({
     type: Object,
     default: () => ({ ...DEFAULT_FILTERS }),
   },
-  allowSave: {
-    type: Boolean,
-    default: true,
-  },
 });
 
-const emit = defineEmits(['close', 'apply', 'save']);
+const emit = defineEmits(['close', 'apply']);
 
 const visible = computed({
   get: () => props.open,
@@ -106,15 +101,13 @@ watch(
 
 function handleReset() {
   filters.value = { ...DEFAULT_FILTERS };
+  emit('apply', { ...DEFAULT_FILTERS });
+  emit('close');
 }
 
 function handleApply() {
   emit('apply', { ...filters.value });
   emit('close');
-}
-
-function handleSave() {
-  emit('save', { ...filters.value });
 }
 </script>
 
