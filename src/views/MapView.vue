@@ -130,6 +130,7 @@ import { parseGeoPointString, serializeGeoPoints } from '@/utils/geo';
 import { getHeatValue, normalizeHeatValues } from '@/utils/heatmap';
 import { favoriteToServerPayload, normalizeFavorite } from '@/utils/favorites';
 import { usePointInPolygon } from '@/composables/usePointInPolygon';
+import { loadBuildingsCache, saveBuildingsCache } from '@/utils/buildingsCache';
 
 const toast = useToast();
 const { isPointInside } = usePointInPolygon();
@@ -328,19 +329,37 @@ async function loadCityData() {
 }
 
 async function loadBuildings() {
-  buildings.value = [];
-  buildingsLoading.value = true;
-  buildingsLoaded.value = 0;
-  buildingsTotal.value = 0;
+  const cityId = selectedCity.value?.id;
+  if (!cityId) return;
+
+  const cached = loadBuildingsCache(cityId);
+  if (cached?.buildings?.length) {
+    buildings.value = cached.buildings;
+    buildingsLoaded.value = cached.buildings.length;
+    buildingsTotal.value = cached.buildings.length;
+
+    // If cache is still fresh, skip network completely.
+    if (cached.isFresh) {
+      buildingsLoading.value = false;
+      return;
+    }
+    // Stale-while-revalidate: show cached data immediately, refresh silently.
+  } else {
+    buildings.value = [];
+    buildingsLoaded.value = 0;
+    buildingsTotal.value = 0;
+  }
 
   try {
+    // Only show loader overlay when we have nothing to show yet.
+    buildingsLoading.value = !cached?.buildings?.length;
     const pageSize = 200;
     let page = 1;
     let total = 0;
     const nextBuildings = [];
 
     do {
-      const { data } = await mapApi.getBuildings(selectedCity.value.id, { page, pageSize });
+      const { data } = await mapApi.getBuildings(cityId, { page, pageSize });
       const list = data.Buildings || data.buildings || [];
       total = data.Amount || data.amount || list.length;
       buildingsTotal.value = Number(total) || nextBuildings.length + list.length;
@@ -352,6 +371,7 @@ async function loadBuildings() {
 
     // Important: assign once to avoid massive child-patching while map initializes.
     buildings.value = nextBuildings;
+    saveBuildingsCache(cityId, nextBuildings);
   } catch (error) {
     console.error(error);
     toast.add({
