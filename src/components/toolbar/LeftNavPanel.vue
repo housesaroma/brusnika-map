@@ -249,6 +249,10 @@ function handleCityChange(city) {
   color: var(--app-primary-contrast);
 }
 
+.left-nav__item--active:hover {
+  background: var(--app-primary);
+}
+
 .left-nav__item--active i,
 .left-nav__item--active small {
   color: var(--app-primary-contrast);

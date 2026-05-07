@@ -3,6 +3,8 @@ export function getHeatValue(item, mode) {
   switch (mode) {
     case 'price':
       return Number(item.MedianActualPrice || item.medianActualPrice || 0);
+    case 'sqm':
+      return Number(item.PricePerSqm || item.pricePerSqm || item.SQM || item.sqm || 0);
     case 'count':
       return Number(item.FlatsCount || item.flatsCount || 0);
     case 'year':

@@ -125,7 +125,7 @@ import {
   applyFiltersToFlats,
 } from '@/utils/filters';
 import { normalizeBuilding, normalizeFlat } from '@/utils/normalize';
-import { parseGeoPointString, serializeGeoPoints } from '@/utils/geo';
+import { serializeGeoPoints } from '@/utils/geo';
 import { getHeatValue, normalizeHeatValues } from '@/utils/heatmap';
 import { favoriteToServerPayload, normalizeFavorite } from '@/utils/favorites';
 import { usePointInPolygon } from '@/composables/usePointInPolygon';
@@ -181,6 +181,7 @@ const searchTarget = ref(null);
 const heatmapOptions = computed(() => {
   const options = [
     { id: 'price', label: 'По цене' },
+    { id: 'sqm', label: 'По цене м²' },
     { id: 'count', label: 'По кол-ву объявлений' },
     { id: 'year', label: 'По году постройки' },
   ];
@@ -259,13 +260,45 @@ const cityFavorites = computed(() =>
 );
 
 const heatPoints = computed(() => {
-  if (!heatMode.value || !heatData.value.length) return [];
-  const values = heatData.value.map((item) => getHeatValue(item, heatMode.value));
+  if (!heatMode.value) return [];
+  if (!displayFlats.value.length) return [];
+
+  const buckets = new Map();
+
+  for (const flat of displayFlats.value) {
+    if (!Array.isArray(flat.center) || flat.center.length !== 2) continue;
+    const key = flat.coordKey || JSON.stringify(flat.center);
+    const existing = buckets.get(key);
+    if (!existing) {
+      buckets.set(key, {
+        coordinates: flat.center,
+        sumPrice: flat.price || 0,
+        sumSqmPrice: flat.sqm || 0,
+        count: 1,
+      });
+    } else {
+      existing.sumPrice += flat.price || 0;
+      existing.sumSqmPrice += flat.sqm || 0;
+      existing.count += 1;
+    }
+  }
+
+  const items = Array.from(buckets.values()).map((bucket) => ({
+    MedianActualPrice: bucket.count ? bucket.sumPrice / bucket.count : 0,
+    PricePerSqm: bucket.count ? bucket.sumSqmPrice / bucket.count : 0,
+    FlatsCount: bucket.count,
+    coordinates: bucket.coordinates,
+  }));
+
+  if (!items.length) return [];
+
+  const values = items.map((item) => getHeatValue(item, heatMode.value));
   const normalized = normalizeHeatValues(values);
-  return heatData.value
+
+  return items
     .map((item, index) => ({
-      id: item.coordinates || item.Coordinates || index,
-      coordinates: parseGeoPointString(item.coordinates || item.Coordinates || '')[0],
+      id: index,
+      coordinates: item.coordinates,
       value: normalized[index] ?? 0,
     }))
     .filter((point) => Array.isArray(point.coordinates));
@@ -324,7 +357,7 @@ async function loadCityData() {
     return;
   }
 
-  await Promise.all([loadBuildings(), loadFlats(), loadHeatmapIfNeeded()]);
+  await Promise.all([loadBuildings(), loadFlats()]);
 }
 
 async function loadBuildings() {
@@ -416,27 +449,6 @@ async function loadFlats(reason = 'filters') {
     });
   } finally {
     flatsLoading.value = false;
-  }
-}
-
-async function loadHeatmapIfNeeded() {
-  if (!selectedCity.value?.id) return;
-  if (!heatMode.value) return;
-  await loadHeatmap();
-}
-
-async function loadHeatmap() {
-  try {
-    const { data } = await mapApi.getHeatmap(selectedCity.value.id);
-    heatData.value = data.HeatMapObjects || data.heatMapObjects || [];
-  } catch (error) {
-    console.error(error);
-    toast.add({
-      severity: 'warn',
-      summary: 'Тепловая карта',
-      detail: 'Не удалось загрузить данные тепловой карты.',
-      life: 3000,
-    });
   }
 }
 
@@ -634,9 +646,6 @@ function handleRenameFavorite(updated) {
 
 function handleHeatmapToggle(mode) {
   heatMode.value = mode;
-  if (heatMode.value) {
-    loadHeatmap();
-  }
 }
 
 function handleCityChange(city) {
