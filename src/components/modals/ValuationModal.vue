@@ -1,0 +1,248 @@
+<template>
+  <Dialog v-model:visible="visible" modal class="valuation-modal" :style="{ width: '720px' }">
+    <template #header>
+      <div class="valuation-modal__header">
+        <i class="pi pi-calculator"></i>
+        <h3>Оценка стоимости</h3>
+      </div>
+    </template>
+
+    <div v-if="loading" class="valuation-modal__loader">
+      <StepLoader @done="handleLoadingDone" />
+    </div>
+
+    <div v-else-if="result" class="valuation-modal__result">
+      <div class="valuation-modal__result-card">
+        <p>Прогнозная стоимость</p>
+        <strong>{{ formatCompactPrice(result.predictedPrice) }}</strong>
+        <small>{{ formatPricePerSqm(result.pricePerSqm) }}</small>
+        <span v-if="result.avgAnalogPrice"
+          >Средняя цена аналогов: {{ formatCompactPrice(result.avgAnalogPrice) }}</span
+        >
+      </div>
+      <AnalogSlider :analogs="result.analogs" />
+      <Button
+        class="valuation-modal__action"
+        label="Изменить параметры"
+        outlined
+        @click="result = null"
+      />
+    </div>
+
+    <div v-else class="valuation-modal__form">
+      <section>
+        <h4>Обязательные поля</h4>
+        <div class="valuation-modal__grid">
+          <div class="field">
+            <label>Комнат</label>
+            <Dropdown v-model="params.rooms" :options="roomOptions" />
+          </div>
+          <div class="field">
+            <label>Общая площадь (м²)</label>
+            <InputText v-model.number="params.area" type="number" />
+          </div>
+          <div class="field">
+            <label>Этаж</label>
+            <InputText v-model.number="params.floor" type="number" />
+          </div>
+          <div class="field">
+            <label>Расстояние до метро (мин)</label>
+            <InputText v-model.number="params.metroDistance" type="number" />
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h4>Дополнительные поля</h4>
+        <div class="valuation-modal__grid">
+          <div class="field">
+            <label>Материал дома</label>
+            <Dropdown
+              v-model="params.material"
+              :options="materialOptions"
+              option-label="label"
+              option-value="value"
+            />
+          </div>
+          <div class="field">
+            <label>Ремонт</label>
+            <Dropdown
+              v-model="params.renovation"
+              :options="renovationOptions"
+              option-label="label"
+              option-value="value"
+            />
+          </div>
+          <div class="field">
+            <label>Площадь кухни (м²)</label>
+            <InputText v-model.number="params.kitchenArea" type="number" />
+          </div>
+          <div class="field">
+            <label>Год постройки</label>
+            <InputText v-model.number="params.yearBuilt" type="number" />
+          </div>
+          <div class="field field--inline">
+            <InputSwitch v-model="params.balcony" />
+            <span>Балкон</span>
+          </div>
+        </div>
+      </section>
+
+      <Button class="valuation-modal__action" label="Рассчитать оценку" @click="handleEvaluate" />
+    </div>
+  </Dialog>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue';
+import Dialog from 'primevue/dialog';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import Dropdown from 'primevue/dropdown';
+import InputSwitch from 'primevue/inputswitch';
+import AnalogSlider from './AnalogSlider.vue';
+import StepLoader from './StepLoader.vue';
+import { formatCompactPrice, formatPricePerSqm } from '@/utils/formatters';
+
+const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
+});
+
+const emit = defineEmits(['close']);
+
+const visible = computed({
+  get: () => props.open,
+  set: (value) => {
+    if (!value) emit('close');
+  },
+});
+
+const roomOptions = [1, 2, 3, 4, 5];
+
+const materialOptions = [
+  { label: 'Кирпичный', value: 'brick' },
+  { label: 'Монолитный', value: 'monolith' },
+  { label: 'Панельный', value: 'panel' },
+  { label: 'Кирпично-монолитный', value: 'monolith_brick' },
+];
+
+const renovationOptions = [
+  { label: 'Черновая', value: 'rough' },
+  { label: 'Предчистовая', value: 'pre' },
+  { label: 'Чистовая', value: 'clean' },
+  { label: 'Под ключ', value: 'full' },
+];
+
+const params = ref({
+  rooms: 2,
+  area: 55,
+  kitchenArea: 10,
+  floor: 5,
+  metroDistance: 10,
+  material: 'monolith',
+  renovation: 'clean',
+  balcony: true,
+  yearBuilt: 2018,
+});
+
+const result = ref(null);
+const loading = ref(false);
+
+function handleEvaluate() {
+  loading.value = true;
+  result.value = null;
+}
+
+function handleLoadingDone() {
+  const basePrice = 130000;
+  const renovationFactor =
+    params.value.renovation === 'full' ? 1.2 : params.value.renovation === 'clean' ? 1.1 : 1.0;
+  const materialFactor =
+    params.value.material === 'monolith' ? 1.1 : params.value.material === 'brick' ? 1.05 : 1.0;
+  const metroFactor = 1 - Math.max(0, params.value.metroDistance - 5) * 0.01;
+  const pricePerSqm = Math.max(65000, basePrice * renovationFactor * materialFactor * metroFactor);
+  const predictedPrice = Math.round(pricePerSqm * params.value.area);
+
+  result.value = {
+    predictedPrice,
+    pricePerSqm,
+    avgAnalogPrice: Math.round(predictedPrice * 0.96),
+    analogs: [],
+  };
+  loading.value = false;
+}
+</script>
+
+<style scoped>
+.valuation-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.valuation-modal__header h3 {
+  margin: 0;
+}
+
+.valuation-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.valuation-modal__form section h4 {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: var(--app-muted-foreground);
+}
+
+.valuation-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+
+.field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.valuation-modal__action {
+  margin-top: 6px;
+  background: var(--app-primary);
+  border: none;
+}
+
+.valuation-modal__result {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.valuation-modal__result-card {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 0, 30, 0.3);
+  background: rgba(255, 0, 30, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+
+.valuation-modal__result-card strong {
+  font-size: 1.5rem;
+}
+</style>

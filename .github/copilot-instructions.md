@@ -11,12 +11,13 @@
 - Vue 3 (Composition API, `<script setup>`)
 - Vite 8
 - Yandex Maps API v3 (`vue-yandex-maps`)
-- PrimeVue
 - Pinia
 - Vue Router
 - Axios
 
 **Backend:** .NET (в отдельном репозитории)
+
+**Auth:** Не требуется. Система без разделения по ролям, все пользователи имеют одинаковый доступ.
 
 ---
 
@@ -42,7 +43,7 @@ src/
 
 - Components: PascalCase (`PropertyMarker.vue`, `PolygonDrawer.vue`)
 - Composables: camelCase with `use` prefix (`usePolygonDrawing.js`)
-- Stores: camelCase (`properties.js`, `auth.js`)
+- Stores: camelCase (`properties.js`, `polygons.js`)
 - Utils: camelCase (`geo.js`, `formatters.js`)
 
 ### Component Guidelines
@@ -62,7 +63,7 @@ src/
 
 ### State Management (Pinia)
 
-- One store per domain: `auth`, `properties`, `polygons`, `predictions`
+- One store per domain: `properties`, `polygons`
 - Use `storeToRefs` for reactive destructuring
 - API calls go into store actions
 - Computed state goes into getters
@@ -72,12 +73,6 @@ src/
 - All API calls must go through `src/api/` modules
 - Use axios instances with base URL and interceptors
 - Handle errors consistently
-
-### UI (PrimeVue)
-
-- Import components from `primevue/*`
-- Use PrimeVue form components for consistency
-- Follow PrimeVue theming system
 
 ---
 
@@ -123,7 +118,7 @@ Examples:
 ### Error Handling
 
 - Handle API calls with `try/catch`
-- Show user-friendly errors (PrimeVue Toast)
+- Show user-friendly errors
 - Log errors in development
 
 ### Security
@@ -138,7 +133,6 @@ Examples:
 
 ```env
 VITE_YANDEX_MAPS_API_KEY=...
-VITE_API_URL=http://localhost:5000/api/v1
 ```
 
 ## Git Rules
