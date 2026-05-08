@@ -24,3 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+/.vs/brusnika-map/FileContentIndex
+/.vs/brusnika-map/v17
+/.vs
