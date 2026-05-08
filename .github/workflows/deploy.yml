@@ -79,7 +79,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "
             cd /home/kedrov/frontend-docker && \
             echo \"DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}\" > .env && \
-            docker-compose down && \
+            docker compose down && \
             docker pull ${DOCKERHUB_USERNAME}/realtyapp-frontend:latest && \
-            docker-compose up -d
+            docker compose up -d
           "
