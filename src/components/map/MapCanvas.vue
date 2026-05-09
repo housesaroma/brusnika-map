@@ -798,21 +798,26 @@ code {
 
 <style>
 .building-dot {
-  min-width: 38px;
-  height: 32px;
+  min-width: 26px;
+  height: 22px;
   border-radius: 999px;
-  padding: 0 10px;
+  padding: 0 5px;
   background: #ff001e;
   color: #fff;
-  border: 2px solid #fff;
+  border: 1px solid #fff;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   justify-content: center;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
-  box-shadow: 0 8px 18px rgba(255, 0, 30, 0.4);
+  box-shadow: 0 3px 10px rgba(255, 0, 30, 0.35);
   transform: translate(-50%, -100%);
+}
+
+.building-dot i {
+  font-size: 10px;
+  line-height: 1;
 }
 
 .building-dot--disabled,
@@ -832,18 +837,18 @@ code {
 }
 
 .cluster-marker {
-  width: 42px;
-  height: 42px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: #7f1d1d;
   color: #fff;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #fff;
-  box-shadow: 0 8px 20px rgba(127, 29, 29, 0.45);
+  border: 1px solid #fff;
+  box-shadow: 0 4px 12px rgba(127, 29, 29, 0.4);
   transform: translate(-50%, -50%);
   cursor: pointer;
 }

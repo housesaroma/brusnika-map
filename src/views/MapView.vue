@@ -174,22 +174,28 @@ const showPolygonSidebar = ref(false);
 const drawingEnabledAt = ref(0);
 
 const heatMode = ref(null);
-const heatData = ref([]);
 
 const searchTarget = ref(null);
 
 const heatmapOptions = computed(() => {
-  const options = [
-    { id: 'price', label: 'По цене' },
-    { id: 'sqm', label: 'По цене м²' },
-    { id: 'count', label: 'По кол-ву объявлений' },
-    { id: 'year', label: 'По году постройки' },
-  ];
-  if (
-    heatData.value.some((item) => Number(item.MedianPredictedPrice || item.medianPredictedPrice))
-  ) {
-    options.push({ id: 'predicted', label: 'По прогнозной цене' });
+  // Heatmap is built purely on the frontend from already loaded map data.
+  // Buildings allow: count/year. Flats allow: price/sqm/predicted.
+  const options = [];
+  const hasBuildings = displayBuildings.value.length > 0;
+  const hasFlats = displayFlats.value.length > 0;
+
+  if (hasFlats) {
+    options.push({ id: 'price', label: 'По цене' });
+    options.push({ id: 'sqm', label: 'По цене м²' });
+    options.push({ id: 'count', label: 'По кол-ву объявлений' });
+  } else if (hasBuildings) {
+    options.push({ id: 'count', label: 'По кол-ву объявлений' });
   }
+
+  if (hasBuildings) {
+    options.push({ id: 'year', label: 'По году постройки' });
+  }
+
   return options;
 });
 
@@ -261,11 +267,52 @@ const cityFavorites = computed(() =>
 
 const heatPoints = computed(() => {
   if (!heatMode.value) return [];
-  if (!displayFlats.value.length) return [];
+  const mode = heatMode.value;
+  const buildingsItems = buildHeatItemsFromBuildings(displayBuildings.value);
+  const flatsItems = buildHeatItemsFromFlats(displayFlats.value);
+
+  // `count` can be derived from both buildings and flats.
+  // Prefer buildings (more stable), fallback to flats when buildings are not available.
+  const items =
+    mode === 'year'
+      ? buildingsItems
+      : mode === 'count'
+        ? buildingsItems.length
+          ? buildingsItems
+          : flatsItems
+        : flatsItems;
+
+  if (!items.length) return [];
+
+  const values = items.map((item) => getHeatValue(item, mode));
+  const normalized = normalizeHeatValues(values);
+
+  return items
+    .map((item, index) => ({
+      id: index,
+      coordinates: item.coordinates,
+      value: normalized[index] ?? 0,
+    }))
+    .filter((point) => Array.isArray(point.coordinates) && point.coordinates.length === 2);
+});
+
+function buildHeatItemsFromBuildings(buildingsList) {
+  if (!Array.isArray(buildingsList) || !buildingsList.length) return [];
+  return buildingsList
+    .filter((building) => Array.isArray(building.center) && building.center.length === 2)
+    .map((building) => ({
+      FlatsCount: Number(building.flatCount || 0),
+      YearBuilt: building.yearBuilt || 0,
+      coordinates: building.center,
+    }));
+}
+
+function buildHeatItemsFromFlats(flatsList) {
+  if (!Array.isArray(flatsList) || !flatsList.length) return [];
 
   const buckets = new Map();
 
-  for (const flat of displayFlats.value) {
+  for (const flat of flatsList) {
     if (!Array.isArray(flat.center) || flat.center.length !== 2) continue;
     const key = flat.coordKey || JSON.stringify(flat.center);
     const existing = buckets.get(key);
@@ -283,26 +330,13 @@ const heatPoints = computed(() => {
     }
   }
 
-  const items = Array.from(buckets.values()).map((bucket) => ({
+  return Array.from(buckets.values()).map((bucket) => ({
     MedianActualPrice: bucket.count ? bucket.sumPrice / bucket.count : 0,
     PricePerSqm: bucket.count ? bucket.sumSqmPrice / bucket.count : 0,
     FlatsCount: bucket.count,
     coordinates: bucket.coordinates,
   }));
-
-  if (!items.length) return [];
-
-  const values = items.map((item) => getHeatValue(item, heatMode.value));
-  const normalized = normalizeHeatValues(values);
-
-  return items
-    .map((item, index) => ({
-      id: index,
-      coordinates: item.coordinates,
-      value: normalized[index] ?? 0,
-    }))
-    .filter((point) => Array.isArray(point.coordinates));
-});
+}
 
 const isMapLoading = computed(() => buildingsLoading.value || flatsLoading.value);
 const loadingPhase = computed(() => {
@@ -330,6 +364,24 @@ watch(
       saveCitySelection(selectedCity.value);
       resetMapState();
       loadCityData();
+    }
+  }
+);
+
+watch(
+  () => heatMode.value,
+  (mode) => {
+    // If user selected a mode that requires flats but flats are not loaded,
+    // auto-disable to avoid confusing "empty" heatmap state.
+    const needsFlats = mode === 'price' || mode === 'sqm' || mode === 'predicted';
+    if (needsFlats && !displayFlats.value.length) {
+      heatMode.value = null;
+      toast.add({
+        severity: 'warn',
+        summary: 'Тепловая карта',
+        detail: 'Для этого режима нужны загруженные квартиры.',
+        life: 3000,
+      });
     }
   }
 );
@@ -695,7 +747,6 @@ function resetMapState() {
   polygonPoints.value = [];
   showPolygonSidebar.value = false;
   heatMode.value = null;
-  heatData.value = [];
 }
 </script>
 

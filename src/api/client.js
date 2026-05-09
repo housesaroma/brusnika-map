@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5031/api/v1';
+const API_URL =
+  // In dev prefer Vite proxy (`vite.config.js` proxies `/api` to backend).
+  // This avoids CORS and "Network Error" from the browser.
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? '/api/v1' : 'http://localhost:5031/api/v1');
 
 export const apiClient = axios.create({
   baseURL: API_URL,
