@@ -16,6 +16,10 @@
           <p class="detail-modal__meta">
             {{ flat.rooms }}-комн. · {{ flat.area }} м² · Этаж {{ flat.floor }}
           </p>
+          <p class="detail-modal__status">
+            <i class="pi pi-calendar"></i>
+            {{ statusText }}
+          </p>
         </div>
         <Tag severity="secondary">{{ sourceLabel }}</Tag>
       </div>
@@ -29,7 +33,10 @@
         <div class="detail-modal__price-card detail-modal__price-card--accent">
           <span>Прогнозная оценка</span>
           <strong>{{ predictedLabel }}</strong>
-          <small v-if="prediction">{{ predictionDelta }}</small>
+          <div v-if="predictionTrend" class="detail-modal__trend" :class="predictionTrendClass">
+            <i :class="predictionTrend.icon"></i>
+            <small>{{ predictionTrend.label }}</small>
+          </div>
           <small v-else>Нет данных</small>
         </div>
       </div>
@@ -101,7 +108,10 @@ const visible = computed({
 
 const sourceLabel = computed(() => {
   const map = { cian: 'Циан', domclick: 'Домклик', avito: 'Авито' };
-  return map[props.flat?.source] || props.flat?.source || 'Источник';
+  const source = String(props.flat?.source || '')
+    .trim()
+    .toLowerCase();
+  return map[source] || props.flat?.source || 'Источник';
 });
 
 const predictedLabel = computed(() => {
@@ -109,11 +119,27 @@ const predictedLabel = computed(() => {
   return formatCompactPrice(props.prediction.predictedPrice);
 });
 
-const predictionDelta = computed(() => {
-  if (!props.prediction) return '';
+const predictionTrend = computed(() => {
+  if (!props.prediction) return null;
   const deviation = props.prediction.deviationPercent;
-  if (!Number.isFinite(deviation)) return '';
-  return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
+  if (!Number.isFinite(deviation) || deviation === 0) return null;
+  const isUp = deviation > 0;
+  return {
+    isUp,
+    label: `${isUp ? '+' : ''}${deviation.toFixed(1)}%`,
+    icon: isUp ? 'pi pi-arrow-up-right' : 'pi pi-arrow-down-right',
+  };
+});
+
+const predictionTrendClass = computed(() => {
+  if (!predictionTrend.value) return '';
+  return predictionTrend.value.isUp ? 'detail-modal__trend--up' : 'detail-modal__trend--down';
+});
+
+const statusText = computed(() => {
+  const publishedAt = toDate(props.flat?.publishedAt);
+  const dateLabel = publishedAt ? formatDate(publishedAt) : 'Дата не указана';
+  return `Опубликовано ${dateLabel} · ${getStatusLabel(props.flat)}`;
 });
 
 const analogs = computed(() => {
@@ -129,6 +155,35 @@ const analogs = computed(() => {
     pricePerSqm: formatPricePerSqm(item.pricePerSqm || item.PricePerSqm || 0),
   }));
 });
+
+function getStatusLabel(flat) {
+  if (!flat) return 'Активна';
+  if (flat.unpublishedAt) return 'Снято с публикации';
+
+  const rawStatus = flat.status ?? flat.Status ?? flat.FlatStatus ?? flat.flatStatus;
+  const normalized = typeof rawStatus === 'string' ? rawStatus.trim().toLowerCase() : rawStatus;
+
+  if (normalized === 3 || normalized === 'продано') return 'Продано';
+  if (normalized === 1 || normalized === 'в_архиве' || normalized === 'архив') {
+    return 'Снято с публикации';
+  }
+
+  return 'Активна';
+}
+
+function toDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDate(date) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
 </script>
 
 <style scoped>
@@ -164,6 +219,15 @@ const analogs = computed(() => {
   color: var(--app-muted-foreground);
 }
 
+.detail-modal__status {
+  margin: 6px 0 0;
+  font-size: 0.7rem;
+  color: var(--app-muted-foreground);
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .detail-modal__prices {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -187,6 +251,24 @@ const analogs = computed(() => {
 .detail-modal__price-card--accent {
   border-color: rgba(255, 0, 30, 0.25);
   background: rgba(255, 0, 30, 0.06);
+}
+
+.detail-modal__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-modal__trend small {
+  font-weight: 600;
+}
+
+.detail-modal__trend--up {
+  color: #047857;
+}
+
+.detail-modal__trend--down {
+  color: #b91c1c;
 }
 
 .detail-modal__grid {

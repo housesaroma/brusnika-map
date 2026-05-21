@@ -488,7 +488,18 @@ async function loadFlats(reason = 'filters') {
   try {
     const { data } = await mapApi.searchFlats(payload);
     const list = data || [];
-    flats.value = list.map((flat) => normalizeFlat(flat));
+    const normalized = list.map((flat) => normalizeFlat(flat));
+    const addressByCoord = new Map(
+      buildings.value
+        .filter((building) => building.coordKey && building.address)
+        .map((building) => [building.coordKey, building.address])
+    );
+
+    flats.value = normalized.map((flat) => {
+      if (flat.address && flat.address !== 'Без адреса') return flat;
+      const address = addressByCoord.get(flat.coordKey);
+      return address ? { ...flat, address } : flat;
+    });
     flatsLoadedOnce.value = true;
   } catch (error) {
     console.error(error);
