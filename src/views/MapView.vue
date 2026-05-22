@@ -54,18 +54,29 @@
         :building="selectedBuilding"
         :flats="selectedBuildingFlats"
         :selected-flat-id="selectedFlat?.id"
-        :is-open="!!selectedBuilding && !showPolygonSidebar"
+        :is-open="!!selectedBuilding && !isResultsSidebarOpen && !showResultsTable"
         @close="clearBuildingSelection"
         @flat-click="handleFlatClick"
       />
 
-      <PolygonSidebar
-        :is-open="showPolygonSidebar"
+      <FilterResultsSidebar
+        :is-open="isResultsSidebarOpen"
+        :mode="resultsSidebarMode"
         :flats="displayFlats"
         :selected-flat-id="selectedFlat?.id"
-        @close="closePolygonSidebar"
+        @close="closeResultsSidebar"
         @flat-click="handleFlatClick"
         @save="handleSavePolygon"
+        @show-table="openResultsTable"
+      />
+
+      <FlatsResultsTable
+        :is-open="showResultsTable"
+        :rows="tableRows"
+        :title="resultsTableTitle"
+        :selected-flat-id="selectedFlat?.id"
+        @close="closeResultsTable"
+        @flat-click="handleFlatClick"
       />
     </div>
 
@@ -105,7 +116,8 @@ import LeftNavPanel from '@/components/toolbar/LeftNavPanel.vue';
 import MapCanvas from '@/components/map/MapCanvas.vue';
 import SearchBar from '@/components/map/SearchBar.vue';
 import PropertySidebar from '@/components/sidebar/PropertySidebar.vue';
-import PolygonSidebar from '@/components/sidebar/PolygonSidebar.vue';
+import FilterResultsSidebar from '@/components/sidebar/FilterResultsSidebar.vue';
+import FlatsResultsTable from '@/components/panels/FlatsResultsTable.vue';
 import PropertyDetailModal from '@/components/modals/PropertyDetailModal.vue';
 import ValuationModal from '@/components/modals/ValuationModal.vue';
 import FiltersModal from '@/components/modals/FiltersModal.vue';
@@ -130,6 +142,8 @@ import { getHeatValue, normalizeHeatValues } from '@/utils/heatmap';
 import { favoriteToServerPayload, normalizeFavorite } from '@/utils/favorites';
 import { usePointInPolygon } from '@/composables/usePointInPolygon';
 import { loadBuildingsCache, saveBuildingsCache } from '@/utils/buildingsCache';
+import { normalizePrediction } from '@/utils/prediction';
+import { buildFlatTableRow } from '@/utils/flatTable';
 
 const toast = useToast();
 const { isPointInside } = usePointInPolygon();
@@ -171,6 +185,8 @@ const isDrawing = ref(false);
 const polygonPoints = ref([]);
 const activePolygon = ref(null);
 const showPolygonSidebar = ref(false);
+const showFilterResultsSidebar = ref(false);
+const showResultsTable = ref(false);
 const drawingEnabledAt = ref(0);
 
 const heatMode = ref(null);
@@ -200,6 +216,20 @@ const heatmapOptions = computed(() => {
 });
 
 const hasFilters = computed(() => hasActiveFiltersUtil(filters.value));
+
+const resultsSidebarMode = computed(() => (showPolygonSidebar.value ? 'polygon' : 'filters'));
+
+const isResultsSidebarOpen = computed(() => {
+  if (showResultsTable.value || selectedBuilding.value || flatsLoadFailed.value) return false;
+  if (showPolygonSidebar.value) return true;
+  return showFilterResultsSidebar.value && hasFilters.value && flatsLoadedOnce.value;
+});
+
+const resultsTableTitle = computed(() =>
+  showPolygonSidebar.value ? 'Объекты в полигоне' : 'Результаты фильтрации'
+);
+
+const tableRows = computed(() => displayFlats.value.map((flat) => buildFlatTableRow(flat)));
 
 const closedPolygon = computed(() => {
   if (!activePolygon.value || activePolygon.value.length < 3) return null;
@@ -556,7 +586,7 @@ function handleSearch(result) {
 
 function handleBuildingClick(building) {
   selectedBuilding.value = building;
-  showPolygonSidebar.value = false;
+  showResultsTable.value = false;
   selectedFlat.value = null;
 }
 
@@ -578,14 +608,7 @@ async function fetchPrediction(flatId) {
 
   try {
     const { data } = await predictionsApi.getFlatPrediction(flatId);
-    prediction.value = {
-      predictedPrice: data.predictedPrice ?? data.PredictedPrice,
-      deviationPercent: data.deviationPercent ?? data.DeviationPercent,
-      actualPrice: data.actualPrice ?? data.ActualPrice,
-      status: data.status ?? data.Status,
-      recommendation: data.recommendation ?? data.Recommendation,
-      confidence: data.confidence ?? data.Confidence,
-    };
+    prediction.value = normalizePrediction(data);
   } catch (error) {
     console.error(error);
   } finally {
@@ -596,6 +619,9 @@ async function fetchPrediction(flatId) {
 function handleApplyFilters(nextFilters) {
   filters.value = { ...DEFAULT_FILTERS, ...nextFilters };
   saveFilters(filters.value);
+  showFilterResultsSidebar.value = hasActiveFiltersUtil(filters.value);
+  showResultsTable.value = false;
+  selectedBuilding.value = null;
   loadFlats();
 }
 
@@ -610,6 +636,8 @@ function toggleDrawing() {
   polygonPoints.value = [];
   activePolygon.value = null;
   showPolygonSidebar.value = false;
+  showFilterResultsSidebar.value = false;
+  showResultsTable.value = false;
   drawingEnabledAt.value = Date.now();
 }
 
@@ -623,13 +651,29 @@ function finishPolygon() {
   polygonPoints.value = [];
   isDrawing.value = false;
   showPolygonSidebar.value = true;
+  showFilterResultsSidebar.value = false;
+  showResultsTable.value = false;
+  selectedBuilding.value = null;
   loadFlats('polygon');
 }
 
-function closePolygonSidebar() {
-  showPolygonSidebar.value = false;
-  activePolygon.value = null;
-  loadFlats();
+function closeResultsSidebar() {
+  if (showPolygonSidebar.value) {
+    showPolygonSidebar.value = false;
+    activePolygon.value = null;
+    loadFlats();
+    return;
+  }
+
+  showFilterResultsSidebar.value = false;
+}
+
+function openResultsTable() {
+  showResultsTable.value = true;
+}
+
+function closeResultsTable() {
+  showResultsTable.value = false;
 }
 
 async function handleSavePolygon(name) {
@@ -677,14 +721,17 @@ function handleSelectFavorite(favorite) {
   if (hasPolygon) {
     activePolygon.value = [...favorite.geoPoints];
     showPolygonSidebar.value = true;
+    showFilterResultsSidebar.value = false;
     reason = 'polygon';
   } else {
     activePolygon.value = null;
     showPolygonSidebar.value = false;
+    showFilterResultsSidebar.value = hasFilterConfig;
   }
 
   selectedBuilding.value = null;
   selectedFlat.value = null;
+  showResultsTable.value = false;
   showFavorites.value = false;
   loadFlats(reason);
 }
@@ -757,6 +804,8 @@ function resetMapState() {
   activePolygon.value = null;
   polygonPoints.value = [];
   showPolygonSidebar.value = false;
+  showFilterResultsSidebar.value = false;
+  showResultsTable.value = false;
   heatMode.value = null;
 }
 </script>
