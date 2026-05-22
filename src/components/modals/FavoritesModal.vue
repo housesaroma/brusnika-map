@@ -38,11 +38,12 @@
 
             <div class="favorite-card__tags">
               <Tag severity="secondary">Полигон</Tag>
+              <Tag v-if="fav.isDistrict" severity="info">Район</Tag>
               <Tag v-if="hasFilters(fav)" severity="secondary">Фильтры</Tag>
             </div>
 
             <Button
-              label="Применить полигон"
+              :label="fav.isDistrict ? 'Добавить район на карту' : 'Применить полигон'"
               outlined
               size="small"
               class="favorite-card__apply"

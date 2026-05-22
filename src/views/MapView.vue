@@ -28,61 +28,90 @@
         :selected-building-id="selectedBuilding?.id || null"
         :analog-flats="[]"
         :is-drawing="isDrawing"
-        :polygon-points="polygonPoints"
-        :saved-polygon="activePolygon"
+        :is-editing="isEditing"
+        :polygons="polygons"
+        :vertex-points="vertexPoints"
         :drawing-enabled-at="drawingEnabledAt"
         :heat-mode="heatMode"
         :heat-points="heatPoints"
         :search-target="searchTarget"
         @building-click="handleBuildingClick"
         @add-point="handleAddPoint"
+        @map-click="handleMapClick"
+        @update-vertex="handleUpdateVertex"
         @favorites="showFavorites = true"
         @toggle-drawing="toggleDrawing"
       />
 
-      <div v-if="isDrawing" class="drawing-hint">
-        <span>
-          Точек: <strong>{{ polygonPoints.length }}</strong>
-        </span>
-        <div class="drawing-hint__divider"></div>
-        <button :disabled="polygonPoints.length < 3" @click="finishPolygon">
-          Завершить полигон
-        </button>
+      <div v-if="isDrawing || isEditing" class="drawing-hint">
+        <template v-if="isDrawing">
+          <span>
+            Точек: <strong>{{ polygonPoints.length }}</strong> · перетаскивайте вершины
+          </span>
+          <div class="drawing-hint__divider"></div>
+          <button :disabled="polygonPoints.length < 3" @click="finishPolygon">Завершить</button>
+        </template>
+        <template v-else>
+          <span>Редактирование полигона · перетащите точку</span>
+          <div class="drawing-hint__divider"></div>
+          <button @click="stopEditingPolygon">Готово</button>
+        </template>
       </div>
 
       <PropertySidebar
         :building="selectedBuilding"
         :flats="selectedBuildingFlats"
         :selected-flat-id="selectedFlat?.id"
-        :is-open="!!selectedBuilding && !showPolygonSidebar"
+        :is-open="!!selectedBuilding && !isResultsSidebarOpen && !showResultsTable"
         @close="clearBuildingSelection"
         @flat-click="handleFlatClick"
       />
 
-      <PolygonSidebar
-        :is-open="showPolygonSidebar"
+      <FilterResultsSidebar
+        :is-open="isResultsSidebarOpen"
+        :mode="resultsSidebarMode"
         :flats="displayFlats"
+        :polygons="polygons"
+        :editing-polygon-id="editingPolygonId"
         :selected-flat-id="selectedFlat?.id"
-        @close="closePolygonSidebar"
+        @close="closeResultsSidebar"
         @flat-click="handleFlatClick"
         @save="handleSavePolygon"
+        @show-table="openResultsTable"
+        @toggle-polygon="togglePolygonSelection"
+        @edit-polygon="startEditingPolygon"
+        @remove-polygon="removePolygon"
+      />
+
+      <FlatsResultsTable
+        :is-open="showResultsTable"
+        :rows="tableRows"
+        :title="resultsTableTitle"
+        :selected-flat-id="selectedFlat?.id"
+        @close="closeResultsTable"
+        @flat-click="handleFlatClick"
       />
     </div>
 
     <PropertyDetailModal
       :open="showDetailModal"
       :flat="selectedFlat"
+      :flat-details="flatDetails"
+      :closest-metro="closestMetro"
+      :loading-details="flatDetailsLoading"
       :prediction="prediction"
       :loading-prediction="predictionLoading"
-      @close="showDetailModal = false"
+      :analogs="flatAnalogs"
+      :loading-analogs="analogsLoading"
+      @close="closeDetailModal"
+      @select-analog="handleAnalogSelect"
     />
 
     <ValuationModal :open="showValuation" @close="showValuation = false" />
 
     <FiltersModal
-      :open="showFilters"
+      v-model:open="showFilters"
       :current-filters="filters"
-      @close="showFilters = false"
       @apply="handleApplyFilters"
     />
 
@@ -105,13 +134,15 @@ import LeftNavPanel from '@/components/toolbar/LeftNavPanel.vue';
 import MapCanvas from '@/components/map/MapCanvas.vue';
 import SearchBar from '@/components/map/SearchBar.vue';
 import PropertySidebar from '@/components/sidebar/PropertySidebar.vue';
-import PolygonSidebar from '@/components/sidebar/PolygonSidebar.vue';
+import FilterResultsSidebar from '@/components/sidebar/FilterResultsSidebar.vue';
+import FlatsResultsTable from '@/components/panels/FlatsResultsTable.vue';
 import PropertyDetailModal from '@/components/modals/PropertyDetailModal.vue';
 import ValuationModal from '@/components/modals/ValuationModal.vue';
 import FiltersModal from '@/components/modals/FiltersModal.vue';
 import FavoritesModal from '@/components/modals/FavoritesModal.vue';
 
 import mapApi from '@/api/map';
+import { findClosestMetro } from '@/api/geocoder';
 import savedApi from '@/api/saved';
 import predictionsApi from '@/api/predictions';
 
@@ -130,6 +161,18 @@ import { getHeatValue, normalizeHeatValues } from '@/utils/heatmap';
 import { favoriteToServerPayload, normalizeFavorite } from '@/utils/favorites';
 import { usePointInPolygon } from '@/composables/usePointInPolygon';
 import { loadBuildingsCache, saveBuildingsCache } from '@/utils/buildingsCache';
+import { dedupeBuildings, withBuildingMarkerKeys } from '@/utils/buildings';
+import { normalizePrediction, normalizeAnalogList, analogToFlatStub } from '@/utils/prediction';
+import { normalizeFlatDetails } from '@/utils/normalizeFlatDetails';
+import { buildFlatTableRow } from '@/utils/flatTable';
+import { closeRing, createPolygonId } from '@/utils/polygons';
+import {
+  buildDistrictFavoritesForCity,
+  favoriteToMapPolygon,
+  isDistrictsSeeded,
+  markDistrictsSeeded,
+  mergeDistrictFavorites,
+} from '@/utils/polygonFavoritesSeed';
 
 const toast = useToast();
 const { isPointInside } = usePointInPolygon();
@@ -166,52 +209,89 @@ const showFavorites = ref(false);
 
 const prediction = ref(null);
 const predictionLoading = ref(false);
+const flatDetails = ref(null);
+const flatDetailsLoading = ref(false);
+const closestMetro = ref([]);
+const flatAnalogs = ref([]);
+const analogsLoading = ref(false);
 
 const isDrawing = ref(false);
+const isEditing = ref(false);
 const polygonPoints = ref([]);
-const activePolygon = ref(null);
-const showPolygonSidebar = ref(false);
+const polygons = ref([]);
+const editingPolygonId = ref(null);
+const showFilterResultsSidebar = ref(false);
+const showResultsTable = ref(false);
 const drawingEnabledAt = ref(0);
 
 const heatMode = ref(null);
-const heatData = ref([]);
 
 const searchTarget = ref(null);
 
 const heatmapOptions = computed(() => {
-  const options = [
-    { id: 'price', label: 'По цене' },
-    { id: 'sqm', label: 'По цене м²' },
-    { id: 'count', label: 'По кол-ву объявлений' },
-    { id: 'year', label: 'По году постройки' },
-  ];
-  if (
-    heatData.value.some((item) => Number(item.MedianPredictedPrice || item.medianPredictedPrice))
-  ) {
-    options.push({ id: 'predicted', label: 'По прогнозной цене' });
+  // Heatmap is built purely on the frontend from already loaded map data.
+  // Buildings allow: count/year. Flats allow: price/sqm/predicted.
+  const options = [];
+  const hasBuildings = displayBuildings.value.length > 0;
+  const hasFlats = displayFlats.value.length > 0;
+
+  if (hasFlats) {
+    options.push({ id: 'price', label: 'По цене' });
+    options.push({ id: 'sqm', label: 'По цене м²' });
+    options.push({ id: 'count', label: 'По кол-ву объявлений' });
+  } else if (hasBuildings) {
+    options.push({ id: 'count', label: 'По кол-ву объявлений' });
   }
+
+  if (hasBuildings) {
+    options.push({ id: 'year', label: 'По году постройки' });
+  }
+
   return options;
 });
 
 const hasFilters = computed(() => hasActiveFiltersUtil(filters.value));
 
-const closedPolygon = computed(() => {
-  if (!activePolygon.value || activePolygon.value.length < 3) return null;
-  const points = [...activePolygon.value];
-  const [firstLng, firstLat] = points[0];
-  const [lastLng, lastLat] = points[points.length - 1];
-  if (firstLng !== lastLng || firstLat !== lastLat) {
-    points.push([firstLng, firstLat]);
-  }
-  return points;
+const selectedPolygons = computed(() =>
+  polygons.value.filter((polygon) => polygon.selected && polygon.points.length >= 3)
+);
+
+const isPolygonModeActive = computed(() => selectedPolygons.value.length > 0);
+
+const resultsSidebarMode = computed(() => (isPolygonModeActive.value ? 'polygon' : 'filters'));
+
+const isResultsSidebarOpen = computed(() => {
+  if (showResultsTable.value || selectedBuilding.value || flatsLoadFailed.value) return false;
+  if (isPolygonModeActive.value) return true;
+  return showFilterResultsSidebar.value && hasFilters.value && flatsLoadedOnce.value;
 });
+
+const resultsTableTitle = computed(() =>
+  isPolygonModeActive.value ? 'Объекты в полигонах' : 'Результаты фильтрации'
+);
+
+const vertexPoints = computed(() => {
+  if (isDrawing.value) return polygonPoints.value;
+  if (isEditing.value && editingPolygonId.value) {
+    const polygon = polygons.value.find((item) => item.id === editingPolygonId.value);
+    return polygon?.points || [];
+  }
+  return [];
+});
+
+const closedSelectedRings = computed(() =>
+  selectedPolygons.value.map((polygon) => closeRing(polygon.points)).filter(Boolean)
+);
+
+const tableRows = computed(() => displayFlats.value.map((flat) => buildFlatTableRow(flat)));
 
 const filteredFlats = computed(() => applyFiltersToFlats(flats.value, filters.value));
 
 const displayFlats = computed(() => {
-  if (!closedPolygon.value) return filteredFlats.value;
-  return filteredFlats.value.filter((flat) =>
-    flat.center ? isPointInside(flat.center, closedPolygon.value) : false
+  if (!closedSelectedRings.value.length) return filteredFlats.value;
+  return filteredFlats.value.filter(
+    (flat) =>
+      flat.center && closedSelectedRings.value.some((ring) => isPointInside(flat.center, ring))
   );
 });
 
@@ -229,7 +309,7 @@ const displayBuildings = computed(() => {
 
   const canUseFlatsForCounts = flatsLoadedOnce.value && !flatsLoadFailed.value;
 
-  return buildings.value
+  const mapped = buildings.value
     .map((building) => ({
       ...building,
       flatCount: canUseFlatsForCounts
@@ -237,6 +317,8 @@ const displayBuildings = computed(() => {
         : building.flatCount || 0,
     }))
     .filter((building) => building.flatCount > 0);
+
+  return withBuildingMarkerKeys(mapped);
 });
 
 const selectedBuildingFlats = computed(() => {
@@ -261,11 +343,52 @@ const cityFavorites = computed(() =>
 
 const heatPoints = computed(() => {
   if (!heatMode.value) return [];
-  if (!displayFlats.value.length) return [];
+  const mode = heatMode.value;
+  const buildingsItems = buildHeatItemsFromBuildings(displayBuildings.value);
+  const flatsItems = buildHeatItemsFromFlats(displayFlats.value);
+
+  // `count` can be derived from both buildings and flats.
+  // Prefer buildings (more stable), fallback to flats when buildings are not available.
+  const items =
+    mode === 'year'
+      ? buildingsItems
+      : mode === 'count'
+        ? buildingsItems.length
+          ? buildingsItems
+          : flatsItems
+        : flatsItems;
+
+  if (!items.length) return [];
+
+  const values = items.map((item) => getHeatValue(item, mode));
+  const normalized = normalizeHeatValues(values);
+
+  return items
+    .map((item, index) => ({
+      id: index,
+      coordinates: item.coordinates,
+      value: normalized[index] ?? 0,
+    }))
+    .filter((point) => Array.isArray(point.coordinates) && point.coordinates.length === 2);
+});
+
+function buildHeatItemsFromBuildings(buildingsList) {
+  if (!Array.isArray(buildingsList) || !buildingsList.length) return [];
+  return buildingsList
+    .filter((building) => Array.isArray(building.center) && building.center.length === 2)
+    .map((building) => ({
+      FlatsCount: Number(building.flatCount || 0),
+      YearBuilt: building.yearBuilt || 0,
+      coordinates: building.center,
+    }));
+}
+
+function buildHeatItemsFromFlats(flatsList) {
+  if (!Array.isArray(flatsList) || !flatsList.length) return [];
 
   const buckets = new Map();
 
-  for (const flat of displayFlats.value) {
+  for (const flat of flatsList) {
     if (!Array.isArray(flat.center) || flat.center.length !== 2) continue;
     const key = flat.coordKey || JSON.stringify(flat.center);
     const existing = buckets.get(key);
@@ -283,26 +406,13 @@ const heatPoints = computed(() => {
     }
   }
 
-  const items = Array.from(buckets.values()).map((bucket) => ({
+  return Array.from(buckets.values()).map((bucket) => ({
     MedianActualPrice: bucket.count ? bucket.sumPrice / bucket.count : 0,
     PricePerSqm: bucket.count ? bucket.sumSqmPrice / bucket.count : 0,
     FlatsCount: bucket.count,
     coordinates: bucket.coordinates,
   }));
-
-  if (!items.length) return [];
-
-  const values = items.map((item) => getHeatValue(item, heatMode.value));
-  const normalized = normalizeHeatValues(values);
-
-  return items
-    .map((item, index) => ({
-      id: index,
-      coordinates: item.coordinates,
-      value: normalized[index] ?? 0,
-    }))
-    .filter((point) => Array.isArray(point.coordinates));
-});
+}
 
 const isMapLoading = computed(() => buildingsLoading.value || flatsLoading.value);
 const loadingPhase = computed(() => {
@@ -335,6 +445,24 @@ watch(
 );
 
 watch(
+  () => heatMode.value,
+  (mode) => {
+    // If user selected a mode that requires flats but flats are not loaded,
+    // auto-disable to avoid confusing "empty" heatmap state.
+    const needsFlats = mode === 'price' || mode === 'sqm' || mode === 'predicted';
+    if (needsFlats && !displayFlats.value.length) {
+      heatMode.value = null;
+      toast.add({
+        severity: 'warn',
+        summary: 'Тепловая карта',
+        detail: 'Для этого режима нужны загруженные квартиры.',
+        life: 3000,
+      });
+    }
+  }
+);
+
+watch(
   () => favorites.value,
   (value) => {
     saveFavorites(value);
@@ -345,6 +473,20 @@ watch(
 onMounted(() => {
   loadCityData();
 });
+
+async function seedDistrictFavoritesForCity() {
+  const city = selectedCity.value;
+  if (!city?.id || isDistrictsSeeded(city.id)) return;
+
+  try {
+    const districtFavorites = await buildDistrictFavoritesForCity(city);
+    if (!districtFavorites.length) return;
+    favorites.value = mergeDistrictFavorites(favorites.value, districtFavorites, city.id);
+    markDistrictsSeeded(city.id);
+  } catch (error) {
+    console.warn('Failed to seed district favorites', error);
+  }
+}
 
 async function loadCityData() {
   if (!selectedCity.value?.id) {
@@ -357,7 +499,9 @@ async function loadCityData() {
     return;
   }
 
-  await Promise.all([loadBuildings(), loadFlats()]);
+  await loadBuildings();
+  await seedDistrictFavoritesForCity();
+  await loadFlats();
 }
 
 async function loadBuildings() {
@@ -366,9 +510,10 @@ async function loadBuildings() {
 
   const cached = loadBuildingsCache(cityId);
   if (cached?.buildings?.length) {
-    buildings.value = cached.buildings;
-    buildingsLoaded.value = cached.buildings.length;
-    buildingsTotal.value = cached.buildings.length;
+    const cachedBuildings = dedupeBuildings(cached.buildings);
+    buildings.value = cachedBuildings;
+    buildingsLoaded.value = cachedBuildings.length;
+    buildingsTotal.value = cachedBuildings.length;
 
     // If cache is still fresh, skip network completely.
     if (cached.isFresh) {
@@ -402,8 +547,9 @@ async function loadBuildings() {
     } while (nextBuildings.length < total);
 
     // Important: assign once to avoid massive child-patching while map initializes.
-    buildings.value = nextBuildings;
-    saveBuildingsCache(cityId, nextBuildings);
+    const uniqueBuildings = dedupeBuildings(nextBuildings);
+    buildings.value = uniqueBuildings;
+    saveBuildingsCache(cityId, uniqueBuildings);
   } catch (error) {
     console.error(error);
     toast.add({
@@ -436,7 +582,18 @@ async function loadFlats(reason = 'filters') {
   try {
     const { data } = await mapApi.searchFlats(payload);
     const list = data || [];
-    flats.value = list.map((flat) => normalizeFlat(flat));
+    const normalized = list.map((flat) => normalizeFlat(flat));
+    const addressByCoord = new Map(
+      buildings.value
+        .filter((building) => building.coordKey && building.address)
+        .map((building) => [building.coordKey, building.address])
+    );
+
+    flats.value = normalized.map((flat) => {
+      if (flat.address && flat.address !== 'Без адреса') return flat;
+      const address = addressByCoord.get(flat.coordKey);
+      return address ? { ...flat, address } : flat;
+    });
     flatsLoadedOnce.value = true;
   } catch (error) {
     console.error(error);
@@ -473,7 +630,10 @@ function buildFilterPayload() {
     maxPrice,
     minSQM: 0,
     maxSQM: 0,
-    GeoPoint: activePolygon.value ? serializeGeoPoints(activePolygon.value) : '',
+    GeoPoint:
+      selectedPolygons.value.length === 1
+        ? serializeGeoPoints(selectedPolygons.value[0].points)
+        : '',
     Limit: limit,
   };
 }
@@ -493,7 +653,7 @@ function handleSearch(result) {
 
 function handleBuildingClick(building) {
   selectedBuilding.value = building;
-  showPolygonSidebar.value = false;
+  showResultsTable.value = false;
   selectedFlat.value = null;
 }
 
@@ -503,9 +663,83 @@ function clearBuildingSelection() {
 }
 
 function handleFlatClick(flat) {
+  if (!flat?.id) return;
+
   selectedFlat.value = flat;
   showDetailModal.value = true;
+  flatDetails.value = null;
+  closestMetro.value = [];
+  flatAnalogs.value = [];
+  fetchFlatDetails(flat);
   fetchPrediction(flat.id);
+  fetchAnalogs(flat.id);
+}
+
+function handleAnalogSelect(analog) {
+  const flat = analogToFlatStub(analog);
+  if (!flat?.id) return;
+  handleFlatClick(flat);
+}
+
+function closeDetailModal() {
+  showDetailModal.value = false;
+  flatDetails.value = null;
+  closestMetro.value = [];
+  flatAnalogs.value = [];
+}
+
+async function fetchAnalogs(flatId) {
+  if (!flatId) return;
+
+  analogsLoading.value = true;
+  flatAnalogs.value = [];
+
+  try {
+    const { data } = await predictionsApi.getFlatAnalogs(flatId);
+    flatAnalogs.value = normalizeAnalogList(data);
+  } catch (error) {
+    console.error(error);
+    toast.add({
+      severity: 'warn',
+      summary: 'Аналоги',
+      detail: 'Не удалось загрузить аналоги.',
+      life: 3000,
+    });
+  } finally {
+    analogsLoading.value = false;
+  }
+}
+
+async function fetchFlatDetails(flat) {
+  if (!flat?.id) return;
+
+  flatDetailsLoading.value = true;
+  flatDetails.value = null;
+  closestMetro.value = [];
+
+  try {
+    const { data } = await mapApi.getFlat(flat.id);
+    const details = normalizeFlatDetails(data);
+    flatDetails.value = details;
+
+    if (!details?.metro && Array.isArray(flat.center) && flat.center.length === 2) {
+      try {
+        closestMetro.value = await findClosestMetro(flat.center, { results: 3, skip: 1 });
+      } catch (metroError) {
+        console.warn('Failed to resolve closest metro', metroError);
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    toast.add({
+      severity: 'warn',
+      summary: 'Квартира',
+      detail: 'Не удалось загрузить детали объекта.',
+      life: 3000,
+    });
+  } finally {
+    flatDetailsLoading.value = false;
+  }
 }
 
 async function fetchPrediction(flatId) {
@@ -515,14 +749,7 @@ async function fetchPrediction(flatId) {
 
   try {
     const { data } = await predictionsApi.getFlatPrediction(flatId);
-    prediction.value = {
-      predictedPrice: data.predictedPrice ?? data.PredictedPrice,
-      deviationPercent: data.deviationPercent ?? data.DeviationPercent,
-      actualPrice: data.actualPrice ?? data.ActualPrice,
-      status: data.status ?? data.Status,
-      recommendation: data.recommendation ?? data.Recommendation,
-      confidence: data.confidence ?? data.Confidence,
-    };
+    prediction.value = normalizePrediction(data);
   } catch (error) {
     console.error(error);
   } finally {
@@ -531,22 +758,29 @@ async function fetchPrediction(flatId) {
 }
 
 function handleApplyFilters(nextFilters) {
+  showFilters.value = false;
   filters.value = { ...DEFAULT_FILTERS, ...nextFilters };
   saveFilters(filters.value);
+  showFilterResultsSidebar.value = hasActiveFiltersUtil(filters.value);
+  showResultsTable.value = false;
+  selectedBuilding.value = null;
   loadFlats();
 }
 
 function toggleDrawing() {
+  showFilters.value = false;
+
   if (isDrawing.value) {
     isDrawing.value = false;
     polygonPoints.value = [];
     return;
   }
 
+  stopEditingPolygon();
   isDrawing.value = true;
   polygonPoints.value = [];
-  activePolygon.value = null;
-  showPolygonSidebar.value = false;
+  showFilterResultsSidebar.value = false;
+  showResultsTable.value = false;
   drawingEnabledAt.value = Date.now();
 }
 
@@ -554,32 +788,158 @@ function handleAddPoint(point) {
   polygonPoints.value = [...polygonPoints.value, point];
 }
 
-function finishPolygon() {
-  if (polygonPoints.value.length < 3) return;
-  activePolygon.value = [...polygonPoints.value];
-  polygonPoints.value = [];
-  isDrawing.value = false;
-  showPolygonSidebar.value = true;
+function handleUpdateVertex({ index, coordinates, commit = true }) {
+  if (!Array.isArray(coordinates) || coordinates.length !== 2) return;
+
+  if (isDrawing.value) {
+    const next = [...polygonPoints.value];
+    if (!next[index]) return;
+    next[index] = coordinates;
+    polygonPoints.value = next;
+    return;
+  }
+
+  if (!editingPolygonId.value) return;
+  const polygonIndex = polygons.value.findIndex((item) => item.id === editingPolygonId.value);
+  if (polygonIndex < 0) return;
+
+  const nextPoints = [...polygons.value[polygonIndex].points];
+  if (!nextPoints[index]) return;
+  nextPoints[index] = coordinates;
+  polygons.value[polygonIndex] = {
+    ...polygons.value[polygonIndex],
+    points: nextPoints,
+  };
+
+  if (commit) {
+    loadFlats('polygon');
+  }
+}
+
+function handleMapClick(coords) {
+  const hitCandidates = polygons.value
+    .filter((polygon) => polygon.points.length >= 3)
+    .map((polygon) => ({ id: polygon.id, ring: closeRing(polygon.points) }))
+    .filter((item) => item.ring);
+
+  for (let index = hitCandidates.length - 1; index >= 0; index -= 1) {
+    const candidate = hitCandidates[index];
+    if (isPointInside(coords, candidate.ring)) {
+      togglePolygonSelection(candidate.id);
+      return;
+    }
+  }
+}
+
+function togglePolygonSelection(polygonId) {
+  const polygonIndex = polygons.value.findIndex((item) => item.id === polygonId);
+  if (polygonIndex < 0) return;
+  polygons.value[polygonIndex] = {
+    ...polygons.value[polygonIndex],
+    selected: !polygons.value[polygonIndex].selected,
+  };
+  showFilterResultsSidebar.value = false;
+  showResultsTable.value = false;
+  selectedBuilding.value = null;
   loadFlats('polygon');
 }
 
-function closePolygonSidebar() {
-  showPolygonSidebar.value = false;
-  activePolygon.value = null;
-  loadFlats();
+function startEditingPolygon(polygonId) {
+  const polygon = polygons.value.find((item) => item.id === polygonId);
+  if (!polygon || polygon.points.length < 3) return;
+  isDrawing.value = false;
+  polygonPoints.value = [];
+  isEditing.value = true;
+  editingPolygonId.value = polygonId;
+}
+
+function stopEditingPolygon() {
+  isEditing.value = false;
+  editingPolygonId.value = null;
+}
+
+function removePolygon(polygonId) {
+  polygons.value = polygons.value.filter((item) => item.id !== polygonId);
+  if (editingPolygonId.value === polygonId) {
+    stopEditingPolygon();
+  }
+  loadFlats(polygons.value.some((item) => item.selected) ? 'polygon' : 'filters');
+}
+
+function applyFavoritePolygon(favorite) {
+  const mapPolygon = favoriteToMapPolygon(favorite);
+  if (!mapPolygon) return;
+
+  const existingIndex = polygons.value.findIndex((item) => item.presetId === favorite.id);
+  if (existingIndex >= 0) {
+    polygons.value[existingIndex] = {
+      ...polygons.value[existingIndex],
+      selected: !polygons.value[existingIndex].selected,
+    };
+  } else {
+    polygons.value.push(mapPolygon);
+  }
+}
+
+function finishPolygon() {
+  if (polygonPoints.value.length < 3) return;
+
+  const polygon = {
+    id: createPolygonId(),
+    name: 'Новый полигон',
+    points: [...polygonPoints.value],
+    selected: true,
+    isDistrict: false,
+  };
+
+  polygons.value.push(polygon);
+  polygonPoints.value = [];
+  isDrawing.value = false;
+  showFilterResultsSidebar.value = false;
+  showResultsTable.value = false;
+  selectedBuilding.value = null;
+  startEditingPolygon(polygon.id);
+  loadFlats('polygon');
+}
+
+function closeResultsSidebar() {
+  if (isPolygonModeActive.value) {
+    polygons.value = polygons.value.map((polygon) => ({ ...polygon, selected: false }));
+    stopEditingPolygon();
+    loadFlats();
+    return;
+  }
+
+  showFilterResultsSidebar.value = false;
+}
+
+function openResultsTable() {
+  showResultsTable.value = true;
+}
+
+function closeResultsTable() {
+  showResultsTable.value = false;
 }
 
 async function handleSavePolygon(name) {
-  if (!activePolygon.value?.length) return;
+  const polygonToSave =
+    (editingPolygonId.value && polygons.value.find((item) => item.id === editingPolygonId.value)) ||
+    selectedPolygons.value[0];
+
+  if (!polygonToSave?.points?.length) return;
 
   const favorite = {
     id: `fav_${Date.now()}`,
     name,
     filters: { ...filters.value },
-    geoPoints: [...activePolygon.value],
+    geoPoints: [...polygonToSave.points],
     cityId: selectedCity.value?.id || null,
     source: 'local',
+    isDistrict: false,
   };
+
+  polygonToSave.presetId = favorite.id;
+  polygonToSave.name = name;
 
   favorites.value = [favorite, ...favorites.value];
   toast.add({ severity: 'success', summary: 'Избранное', detail: 'Полигон сохранен', life: 3000 });
@@ -612,16 +972,16 @@ function handleSelectFavorite(favorite) {
   let reason = 'filters';
 
   if (hasPolygon) {
-    activePolygon.value = [...favorite.geoPoints];
-    showPolygonSidebar.value = true;
+    applyFavoritePolygon(favorite);
+    showFilterResultsSidebar.value = false;
     reason = 'polygon';
   } else {
-    activePolygon.value = null;
-    showPolygonSidebar.value = false;
+    showFilterResultsSidebar.value = hasFilterConfig;
   }
 
   selectedBuilding.value = null;
   selectedFlat.value = null;
+  showResultsTable.value = false;
   showFavorites.value = false;
   loadFlats(reason);
 }
@@ -691,11 +1051,13 @@ async function syncFavorites() {
 function resetMapState() {
   selectedBuilding.value = null;
   selectedFlat.value = null;
-  activePolygon.value = null;
+  polygons.value = [];
   polygonPoints.value = [];
-  showPolygonSidebar.value = false;
+  isDrawing.value = false;
+  stopEditingPolygon();
+  showFilterResultsSidebar.value = false;
+  showResultsTable.value = false;
   heatMode.value = null;
-  heatData.value = [];
 }
 </script>
 

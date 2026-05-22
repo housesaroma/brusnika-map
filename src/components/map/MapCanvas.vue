@@ -41,7 +41,7 @@
       v-else-if="canRenderMap"
       v-model="map"
       class="map-canvas__map"
-      :class="{ 'map-canvas__map--drawing': isDrawing }"
+      :class="{ 'map-canvas__map--drawing': isDrawing || isEditing }"
       :settings="mapSettings"
       width="100%"
       height="100%"
@@ -51,17 +51,27 @@
       <template v-if="mapReady">
         <YandexMapListener :settings="listenerSettings" />
 
-        <HeatmapLayer v-if="heatMode" :points="heatPoints" />
+        <HeatmapLayer v-if="heatMode && !isDrawing" :points="heatPoints" />
+
+        <PolygonEditorLayer
+          :map-ready="mapReady"
+          :polygons="polygons"
+          :vertex-points="vertexPoints"
+          :is-drawing="isDrawing"
+          :is-editing="isEditing"
+          @vertex-click="emit('vertex-click', $event)"
+          @update-vertex="emit('update-vertex', $event)"
+        />
 
         <YandexMapClusterer
-          v-if="!isDrawing"
+          v-if="!isDrawing && !isEditing && visibleBuildings.length"
           zoom-on-cluster-click
           :grid-size="64"
           :settings="{ maxZoom: 17 }"
         >
           <YandexMapMarker
             v-for="building in visibleBuildings"
-            :key="building.id"
+            :key="building.markerKey"
             :settings="{ coordinates: building.center }"
             @click="emit('building-click', building)"
           >
@@ -76,20 +86,6 @@
           </template>
         </YandexMapClusterer>
 
-        <template v-else>
-          <YandexMapMarker
-            v-for="building in visibleBuildings"
-            :key="building.id"
-            :container-attrs="{ style: { pointerEvents: 'none' } }"
-            :settings="{ coordinates: building.center }"
-          >
-            <div class="building-dot building-dot--disabled">
-              <i class="pi pi-building"></i>
-              <span>{{ building.flatCount || 0 }}</span>
-            </div>
-          </YandexMapMarker>
-        </template>
-
         <YandexMapMarker
           v-for="flat in analogFlats"
           :key="flat.id"
@@ -99,9 +95,6 @@
         >
           <div class="analog-marker" :class="{ 'analog-marker--disabled': isDrawing }"></div>
         </YandexMapMarker>
-
-        <YandexMapFeature v-if="savedFeature" :settings="savedFeature" />
-        <YandexMapFeature v-if="drawingFeature" :settings="drawingFeature" />
       </template>
     </YandexMap>
 
@@ -118,6 +111,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from 'vue';
+import { withBuildingMarkerKeys } from '@/utils/buildings';
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
@@ -125,9 +119,9 @@ import {
   YandexMapClusterer,
   YandexMapListener,
   YandexMapMarker,
-  YandexMapFeature,
 } from 'vue-yandex-maps';
 import HeatmapLayer from './HeatmapLayer.vue';
+import PolygonEditorLayer from './PolygonEditorLayer.vue';
 import FloatControls from '../toolbar/FloatControls.vue';
 import { isValidCenter } from '@/utils/geo';
 
@@ -176,11 +170,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  polygonPoints: {
+  isEditing: {
+    type: Boolean,
+    default: false,
+  },
+  polygons: {
     type: Array,
     default: () => [],
   },
-  savedPolygon: {
+  vertexPoints: {
     type: Array,
     default: () => [],
   },
@@ -202,7 +200,15 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['building-click', 'add-point', 'favorites', 'toggle-drawing']);
+const emit = defineEmits([
+  'building-click',
+  'add-point',
+  'map-click',
+  'vertex-click',
+  'update-vertex',
+  'favorites',
+  'toggle-drawing',
+]);
 
 // vue-yandex-maps expects v-model value to be stored in shallowRef
 const map = shallowRef(null);
@@ -270,7 +276,7 @@ watchEffect(() => {
 });
 
 const visibleBuildings = computed(() =>
-  props.buildings.filter((building) => isValidCenter(building.center))
+  withBuildingMarkerKeys(props.buildings.filter((building) => isValidCenter(building.center)))
 );
 const loadingTitle = computed(() => {
   if (props.loadingPhase === 'buildings') return 'Загружаем объекты карты...';
@@ -347,27 +353,26 @@ onBeforeUnmount(() => {
   stopProgressAnimation();
 });
 
-const drawingFeature = computed(() =>
-  buildPolygonFeature(props.polygonPoints, '#ff001e', 'rgba(255, 0, 30, 0.15)')
-);
-
-const savedFeature = computed(() =>
-  buildPolygonFeature(props.savedPolygon, '#3b82f6', 'rgba(59, 130, 246, 0.12)')
-);
-
-const listenerSettings = {
+const listenerSettings = computed(() => ({
   onUpdate: (event) => {
     const zoom = event?.location?.zoom;
     if (Number.isFinite(zoom)) currentZoom.value = Math.round(zoom);
   },
   onClick: (object, event) => {
-    if (!props.isDrawing) return;
     const coords = extractCoordinates(event) || extractCoordinates(object);
-    if (coords) {
+    if (!coords) return;
+
+    if (props.isDrawing) {
+      // Ignore clicks right after enabling drawing (pencil button click on map).
+      if (Date.now() - props.drawingEnabledAt < 300) return;
       emit('add-point', coords);
+      return;
     }
+
+    if (props.isEditing) return;
+    emit('map-click', coords);
   },
-};
+}));
 
 function extractCoordinates(event) {
   if (Array.isArray(event?.coordinates)) return event.coordinates;
@@ -400,27 +405,6 @@ function handleZoomIn() {
 function handleZoomOut() {
   const nextZoom = Math.max(3, (currentZoom.value || mapLocation.value.zoom || 12) - 1);
   flyTo(mapLocation.value.center, nextZoom);
-}
-
-function buildPolygonFeature(points, strokeColor, fillColor) {
-  if (!Array.isArray(points) || points.length < 3) return null;
-  const closed = [...points];
-  const [firstLng, firstLat] = closed[0];
-  const [lastLng, lastLat] = closed[closed.length - 1];
-  if (firstLng !== lastLng || firstLat !== lastLat) {
-    closed.push([firstLng, firstLat]);
-  }
-
-  return {
-    geometry: {
-      type: 'Polygon',
-      coordinates: [closed],
-    },
-    style: {
-      fill: fillColor,
-      stroke: [{ color: strokeColor, width: 2 }],
-    },
-  };
 }
 </script>
 
@@ -798,21 +782,26 @@ code {
 
 <style>
 .building-dot {
-  min-width: 38px;
-  height: 32px;
+  min-width: 26px;
+  height: 22px;
   border-radius: 999px;
-  padding: 0 10px;
+  padding: 0 5px;
   background: #ff001e;
   color: #fff;
-  border: 2px solid #fff;
+  border: 1px solid #fff;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   justify-content: center;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
-  box-shadow: 0 8px 18px rgba(255, 0, 30, 0.4);
+  box-shadow: 0 3px 10px rgba(255, 0, 30, 0.35);
   transform: translate(-50%, -100%);
+}
+
+.building-dot i {
+  font-size: 10px;
+  line-height: 1;
 }
 
 .building-dot--disabled,
@@ -832,18 +821,18 @@ code {
 }
 
 .cluster-marker {
-  width: 42px;
-  height: 42px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: #7f1d1d;
   color: #fff;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #fff;
-  box-shadow: 0 8px 20px rgba(127, 29, 29, 0.45);
+  border: 1px solid #fff;
+  box-shadow: 0 4px 12px rgba(127, 29, 29, 0.4);
   transform: translate(-50%, -50%);
   cursor: pointer;
 }

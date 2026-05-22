@@ -11,54 +11,92 @@
         <div>
           <p class="detail-modal__address">
             <i class="pi pi-map-marker"></i>
-            {{ flat.address || 'Без адреса' }}
+            {{ display.address || 'Без адреса' }}
           </p>
           <p class="detail-modal__meta">
-            {{ flat.rooms }}-комн. · {{ flat.area }} м² · Этаж {{ flat.floor }}
+            {{ display.rooms }}-комн. · {{ display.area }} м² · Этаж {{ display.floor }}
+          </p>
+          <p class="detail-modal__status">
+            <i class="pi pi-calendar"></i>
+            {{ statusText }}
           </p>
         </div>
-        <Tag severity="secondary">{{ sourceLabel }}</Tag>
+        <Tag severity="secondary">{{ display.sourceLabel }}</Tag>
       </div>
 
       <div class="detail-modal__prices">
         <div class="detail-modal__price-card">
           <span>Текущая цена</span>
-          <strong>{{ formatCompactPrice(flat.price) }}</strong>
-          <small>{{ formatPricePerSqm(flat.sqm) }}</small>
+          <strong>{{ formatCompactPrice(display.price) }}</strong>
+          <small>{{ formatPricePerSqm(display.sqm) }}</small>
         </div>
         <div class="detail-modal__price-card detail-modal__price-card--accent">
           <span>Прогнозная оценка</span>
           <strong>{{ predictedLabel }}</strong>
-          <small v-if="prediction">{{ predictionDelta }}</small>
+          <div v-if="predictionTrend" class="detail-modal__trend" :class="predictionTrendClass">
+            <i :class="predictionTrend.icon"></i>
+            <small>{{ predictionTrend.label }}</small>
+          </div>
+          <small v-else-if="loadingPrediction">Загрузка...</small>
           <small v-else>Нет данных</small>
         </div>
       </div>
 
-      <div class="detail-modal__grid">
+      <div v-if="loadingDetails" class="detail-modal__loading">
+        <ProgressSpinner style="width: 36px; height: 36px" />
+        <p>Загружаем данные объекта...</p>
+      </div>
+
+      <div v-else class="detail-modal__grid">
         <div class="detail-modal__cell">
           <span>Площадь</span>
-          <strong>{{ flat.area }} м²</strong>
+          <strong>{{ display.area }} м²</strong>
         </div>
         <div class="detail-modal__cell">
           <span>Комнат</span>
-          <strong>{{ flat.rooms }}</strong>
+          <strong>{{ display.rooms }}</strong>
         </div>
         <div class="detail-modal__cell">
           <span>Этаж</span>
-          <strong>{{ flat.floor }}</strong>
+          <strong>{{ display.floor }}</strong>
         </div>
         <div class="detail-modal__cell">
-          <span>Цена / м²</span>
-          <strong>{{ formatPricePerSqm(flat.sqm) }}</strong>
+          <span>Кухня</span>
+          <strong>{{ kitchenLabel }}</strong>
+        </div>
+        <div class="detail-modal__cell">
+          <span>Год постройки</span>
+          <strong>{{ display.buildYear ?? '—' }}</strong>
+        </div>
+        <div class="detail-modal__cell">
+          <span>Материал</span>
+          <strong>{{ display.material || '—' }}</strong>
+        </div>
+        <div class="detail-modal__cell">
+          <span>Отделка</span>
+          <strong>{{ display.finishing || '—' }}</strong>
+        </div>
+        <div class="detail-modal__cell">
+          <span>Балкон</span>
+          <strong>{{ display.hasBalcony ? 'Есть' : 'Нет' }}</strong>
+        </div>
+        <div class="detail-modal__cell detail-modal__cell--wide">
+          <span>Метро</span>
+          <strong>{{ metroLabel }}</strong>
         </div>
       </div>
 
-      <div v-if="loadingPrediction" class="detail-modal__loading">
-        <ProgressSpinner style="width: 36px; height: 36px" />
-        <p>Получаем прогноз...</p>
+      <div v-if="prediction?.recommendation" class="detail-modal__recommendation">
+        <span>Рекомендация</span>
+        <p>{{ prediction.recommendation }}</p>
+        <small v-if="prediction.status">{{ prediction.status }}</small>
       </div>
 
-      <AnalogSlider v-if="analogs.length" :analogs="analogs" />
+      <AnalogSlider
+        :analogs="analogs"
+        :loading="loadingAnalogs"
+        @select="emit('select-analog', $event)"
+      />
     </div>
   </Dialog>
 </template>
@@ -70,11 +108,24 @@ import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
 import AnalogSlider from './AnalogSlider.vue';
 import { formatCompactPrice, formatPricePerSqm } from '@/utils/formatters';
+import { getFlatStatusLabel, getSourceLabel, formatFlatDate } from '@/utils/flatLabels';
 
 const props = defineProps({
   flat: {
     type: Object,
     default: null,
+  },
+  flatDetails: {
+    type: Object,
+    default: null,
+  },
+  closestMetro: {
+    type: Array,
+    default: () => [],
+  },
+  loadingDetails: {
+    type: Boolean,
+    default: false,
   },
   prediction: {
     type: Object,
@@ -88,9 +139,17 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  analogs: {
+    type: Array,
+    default: () => [],
+  },
+  loadingAnalogs: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'select-analog']);
 
 const visible = computed({
   get: () => props.open,
@@ -99,9 +158,48 @@ const visible = computed({
   },
 });
 
-const sourceLabel = computed(() => {
-  const map = { cian: 'Циан', domclick: 'Домклик', avito: 'Авито' };
-  return map[props.flat?.source] || props.flat?.source || 'Источник';
+const display = computed(() => {
+  const base = props.flat || {};
+  const details = props.flatDetails || {};
+  const price = details.price ?? base.price ?? 0;
+  const area = details.area ?? base.area ?? 0;
+
+  return {
+    address: details.address || base.address || '',
+    price,
+    area,
+    floor: details.floor ?? base.floor ?? 0,
+    rooms: details.rooms ?? base.rooms ?? 0,
+    kitchenArea: details.kitchenArea ?? 0,
+    buildYear: details.buildYear ?? null,
+    material: details.material ?? '',
+    hasBalcony: details.hasBalcony ?? false,
+    finishing: details.finishing ?? '',
+    publicationDate: details.publicationDate ?? base.publishedAt ?? null,
+    source: details.source || base.source || '',
+    sourceLabel: details.sourceLabel || getSourceLabel(details.source || base.source),
+    metro: details.metro ?? null,
+    sqm: details.sqm ?? base.sqm ?? (area > 0 && price > 0 ? price / area : 0),
+  };
+});
+
+const kitchenLabel = computed(() => {
+  const value = display.value.kitchenArea;
+  if (!Number.isFinite(value) || value <= 0) return '—';
+  return `${value} м²`;
+});
+
+const metroLabel = computed(() => {
+  if (display.value.metro) return display.value.metro;
+  if (!props.closestMetro?.length) return '—';
+  return props.closestMetro
+    .map((station) => {
+      if (station.distanceKm != null) {
+        return `${station.name} (${station.distanceKm.toFixed(1)} км)`;
+      }
+      return station.name;
+    })
+    .join(' · ');
 });
 
 const predictedLabel = computed(() => {
@@ -109,25 +207,27 @@ const predictedLabel = computed(() => {
   return formatCompactPrice(props.prediction.predictedPrice);
 });
 
-const predictionDelta = computed(() => {
-  if (!props.prediction) return '';
+const predictionTrend = computed(() => {
+  if (!props.prediction) return null;
   const deviation = props.prediction.deviationPercent;
-  if (!Number.isFinite(deviation)) return '';
-  return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
+  if (!Number.isFinite(deviation) || deviation === 0) return null;
+  const isUp = deviation > 0;
+  return {
+    isUp,
+    label: `${isUp ? '+' : ''}${deviation.toFixed(1)}%`,
+    icon: isUp ? 'pi pi-arrow-up-right' : 'pi pi-arrow-down-right',
+  };
 });
 
-const analogs = computed(() => {
-  const list = props.prediction?.similarFlats || [];
-  return list.map((item) => ({
-    id: item.flatId || item.FlatId || item.id,
-    rooms: item.rooms || item.Rooms || 0,
-    area: item.area || item.Area || 0,
-    floor: item.floor || item.Floor || 0,
-    price: item.price || item.Price || 0,
-    similarity: item.similarityScore || item.SimilarityScore || 0,
-    address: item.address || item.Address || 'Без адреса',
-    pricePerSqm: formatPricePerSqm(item.pricePerSqm || item.PricePerSqm || 0),
-  }));
+const predictionTrendClass = computed(() => {
+  if (!predictionTrend.value) return '';
+  return predictionTrend.value.isUp ? 'detail-modal__trend--up' : 'detail-modal__trend--down';
+});
+
+const statusText = computed(() => {
+  const publishedAt = display.value.publicationDate;
+  const dateLabel = publishedAt ? formatFlatDate(publishedAt) : 'Дата не указана';
+  return `Опубликовано ${dateLabel} · ${getFlatStatusLabel(props.flat)}`;
 });
 </script>
 
@@ -164,6 +264,15 @@ const analogs = computed(() => {
   color: var(--app-muted-foreground);
 }
 
+.detail-modal__status {
+  margin: 6px 0 0;
+  font-size: 0.7rem;
+  color: var(--app-muted-foreground);
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .detail-modal__prices {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -189,6 +298,24 @@ const analogs = computed(() => {
   background: rgba(255, 0, 30, 0.06);
 }
 
+.detail-modal__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-modal__trend small {
+  font-weight: 600;
+}
+
+.detail-modal__trend--up {
+  color: #047857;
+}
+
+.detail-modal__trend--down {
+  color: #b91c1c;
+}
+
 .detail-modal__grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -205,9 +332,39 @@ const analogs = computed(() => {
   gap: 2px;
 }
 
+.detail-modal__cell--wide {
+  grid-column: 1 / -1;
+}
+
 .detail-modal__cell span {
   font-size: 0.7rem;
   color: var(--app-muted-foreground);
+}
+
+.detail-modal__recommendation {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--app-border);
+  background: rgba(248, 243, 236, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-modal__recommendation span {
+  font-size: 0.7rem;
+  color: var(--app-muted-foreground);
+}
+
+.detail-modal__recommendation p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.detail-modal__recommendation small {
+  color: var(--app-muted-foreground);
+  font-size: 0.75rem;
 }
 
 .detail-modal__loading {

@@ -8,12 +8,31 @@ export function getHeatValue(item, mode) {
     case 'count':
       return Number(item.FlatsCount || item.flatsCount || 0);
     case 'year':
-      return Number(item.YearBuilt || item.yearBuilt || 0);
+      return normalizeYear(item.YearBuilt ?? item.yearBuilt);
     case 'predicted':
       return Number(item.MedianPredictedPrice || item.medianPredictedPrice || 0);
     default:
       return 0;
   }
+}
+
+function normalizeYear(raw) {
+  if (!raw) return 0;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return 0;
+    const asNumber = Number(trimmed);
+    if (Number.isFinite(asNumber)) return asNumber;
+    const date = new Date(trimmed);
+    const year = date.getFullYear();
+    return Number.isFinite(year) ? year : 0;
+  }
+  if (raw instanceof Date) {
+    const year = raw.getFullYear();
+    return Number.isFinite(year) ? year : 0;
+  }
+  return 0;
 }
 
 export function normalizeHeatValues(values) {

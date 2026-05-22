@@ -37,6 +37,28 @@ export function normalizeFlat(flat, buildingMeta = {}) {
     price: Number(flat.Price ?? flat.price ?? 0),
     sqm: Number(flat.SQM ?? flat.sqm ?? flat.PricePerSqm ?? 0),
     source,
+    status:
+      flat.Status ?? flat.status ?? flat.FlatStatus ?? flat.flatStatus ?? flat.statusCode ?? null,
+    publishedAt:
+      flat.PublishedAt ??
+      flat.publishedAt ??
+      flat.FlatPublished ??
+      flat.flatPublished ??
+      flat.publishedDate ??
+      null,
+    unpublishedAt:
+      flat.UnpublishedAt ??
+      flat.unpublishedAt ??
+      flat.FlatUnpublished ??
+      flat.flatUnpublished ??
+      flat.unpublishedDate ??
+      null,
+    priceChangePercent:
+      flat.PriceChangePercent ??
+      flat.priceChangePercent ??
+      flat.priceChangePct ??
+      flat.priceChange ??
+      null,
     pictureUrl: flat.PictureUrl || flat.pictureUrl || '',
     coords: coordsRaw,
     center: parseCoordsToLngLat(coordsRaw),

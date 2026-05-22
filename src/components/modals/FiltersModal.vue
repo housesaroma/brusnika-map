@@ -1,5 +1,5 @@
 <template>
-  <Dialog v-model:visible="visible" modal class="filters-modal" :style="{ width: '560px' }">
+  <Dialog v-model:visible="open" modal class="filters-modal" :style="{ width: '560px' }">
     <template #header>
       <div class="filters-modal__header">
         <i class="pi pi-filter"></i>
@@ -63,31 +63,22 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import { DEFAULT_FILTERS } from '@/utils/filters';
 
 const props = defineProps({
-  open: {
-    type: Boolean,
-    default: false,
-  },
   currentFilters: {
     type: Object,
     default: () => ({ ...DEFAULT_FILTERS }),
   },
 });
 
-const emit = defineEmits(['close', 'apply']);
+const emit = defineEmits(['apply']);
 
-const visible = computed({
-  get: () => props.open,
-  set: (value) => {
-    if (!value) emit('close');
-  },
-});
+const open = defineModel('open', { type: Boolean, default: false });
 
 const filters = ref({ ...DEFAULT_FILTERS });
 
@@ -102,12 +93,12 @@ watch(
 function handleReset() {
   filters.value = { ...DEFAULT_FILTERS };
   emit('apply', { ...DEFAULT_FILTERS });
-  emit('close');
+  open.value = false;
 }
 
 function handleApply() {
   emit('apply', { ...filters.value });
-  emit('close');
+  open.value = false;
 }
 </script>
 

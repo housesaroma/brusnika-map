@@ -12,6 +12,7 @@ export function normalizeFavorite(raw) {
     source: raw.source || 'local',
     serverId: raw.serverId || raw.id || null,
     cityId: raw.cityId || raw.CityId || null,
+    isDistrict: Boolean(raw.isDistrict),
   };
 }
 
