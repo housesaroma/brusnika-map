@@ -24,6 +24,43 @@
       />
     </div>
 
+    <div v-if="mode === 'polygon' && polygons.length" class="sidebar__polygons">
+      <p>Выбранные полигоны ({{ selectedCount }})</p>
+      <div class="sidebar__polygon-list">
+        <div v-for="polygon in polygons" :key="polygon.id" class="sidebar__polygon-item">
+          <label class="sidebar__polygon-label">
+            <input
+              type="checkbox"
+              :checked="polygon.selected"
+              @change="emit('toggle-polygon', polygon.id)"
+            />
+            <span>{{ polygon.name }}</span>
+          </label>
+          <div class="sidebar__polygon-actions">
+            <Button
+              icon="pi pi-pencil"
+              text
+              rounded
+              size="small"
+              :severity="polygon.id === editingPolygonId ? 'warn' : 'secondary'"
+              @click="emit('edit-polygon', polygon.id)"
+            />
+            <Button
+              icon="pi pi-trash"
+              text
+              rounded
+              size="small"
+              severity="danger"
+              @click="emit('remove-polygon', polygon.id)"
+            />
+          </div>
+        </div>
+      </div>
+      <small class="sidebar__polygon-hint"
+        >Клик по полигону на карте включает или выключает выбор</small
+      >
+    </div>
+
     <div v-if="mode === 'polygon'" class="sidebar__save">
       <p>Сохранить полигон в избранное:</p>
       <div class="sidebar__save-controls">
@@ -80,9 +117,27 @@ const props = defineProps({
     default: 'filters',
     validator: (value) => ['filters', 'polygon'].includes(value),
   },
+  polygons: {
+    type: Array,
+    default: () => [],
+  },
+  editingPolygonId: {
+    type: String,
+    default: null,
+  },
 });
 
-const emit = defineEmits(['flat-click', 'close', 'save', 'show-table']);
+const emit = defineEmits([
+  'flat-click',
+  'close',
+  'save',
+  'show-table',
+  'toggle-polygon',
+  'edit-polygon',
+  'remove-polygon',
+]);
+
+const selectedCount = computed(() => props.polygons.filter((polygon) => polygon.selected).length);
 
 const polygonName = ref('');
 const saved = ref(false);
@@ -170,6 +225,55 @@ function handleSave() {
 
 .sidebar__table-button {
   width: 100%;
+}
+
+.sidebar__polygons {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--app-border);
+  background: rgba(248, 243, 236, 0.45);
+}
+
+.sidebar__polygons p {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  color: var(--app-muted-foreground);
+}
+
+.sidebar__polygon-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar__polygon-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.sidebar__polygon-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.sidebar__polygon-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.sidebar__polygon-hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--app-muted-foreground);
+  font-size: 0.7rem;
 }
 
 .sidebar__save {

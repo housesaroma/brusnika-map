@@ -28,26 +28,34 @@
         :selected-building-id="selectedBuilding?.id || null"
         :analog-flats="[]"
         :is-drawing="isDrawing"
-        :polygon-points="polygonPoints"
-        :saved-polygon="activePolygon"
+        :is-editing="isEditing"
+        :polygons="polygons"
+        :vertex-points="vertexPoints"
         :drawing-enabled-at="drawingEnabledAt"
         :heat-mode="heatMode"
         :heat-points="heatPoints"
         :search-target="searchTarget"
         @building-click="handleBuildingClick"
         @add-point="handleAddPoint"
+        @map-click="handleMapClick"
+        @update-vertex="handleUpdateVertex"
         @favorites="showFavorites = true"
         @toggle-drawing="toggleDrawing"
       />
 
-      <div v-if="isDrawing" class="drawing-hint">
-        <span>
-          Точек: <strong>{{ polygonPoints.length }}</strong>
-        </span>
-        <div class="drawing-hint__divider"></div>
-        <button :disabled="polygonPoints.length < 3" @click="finishPolygon">
-          Завершить полигон
-        </button>
+      <div v-if="isDrawing || isEditing" class="drawing-hint">
+        <template v-if="isDrawing">
+          <span>
+            Точек: <strong>{{ polygonPoints.length }}</strong> · перетаскивайте вершины
+          </span>
+          <div class="drawing-hint__divider"></div>
+          <button :disabled="polygonPoints.length < 3" @click="finishPolygon">Завершить</button>
+        </template>
+        <template v-else>
+          <span>Редактирование полигона · перетащите точку</span>
+          <div class="drawing-hint__divider"></div>
+          <button @click="stopEditingPolygon">Готово</button>
+        </template>
       </div>
 
       <PropertySidebar
@@ -63,11 +71,16 @@
         :is-open="isResultsSidebarOpen"
         :mode="resultsSidebarMode"
         :flats="displayFlats"
+        :polygons="polygons"
+        :editing-polygon-id="editingPolygonId"
         :selected-flat-id="selectedFlat?.id"
         @close="closeResultsSidebar"
         @flat-click="handleFlatClick"
         @save="handleSavePolygon"
         @show-table="openResultsTable"
+        @toggle-polygon="togglePolygonSelection"
+        @edit-polygon="startEditingPolygon"
+        @remove-polygon="removePolygon"
       />
 
       <FlatsResultsTable
@@ -152,6 +165,14 @@ import { dedupeBuildings, withBuildingMarkerKeys } from '@/utils/buildings';
 import { normalizePrediction, normalizeAnalogList, analogToFlatStub } from '@/utils/prediction';
 import { normalizeFlatDetails } from '@/utils/normalizeFlatDetails';
 import { buildFlatTableRow } from '@/utils/flatTable';
+import { closeRing, createPolygonId } from '@/utils/polygons';
+import {
+  buildDistrictFavoritesForCity,
+  favoriteToMapPolygon,
+  isDistrictsSeeded,
+  markDistrictsSeeded,
+  mergeDistrictFavorites,
+} from '@/utils/polygonFavoritesSeed';
 
 const toast = useToast();
 const { isPointInside } = usePointInPolygon();
@@ -195,9 +216,10 @@ const flatAnalogs = ref([]);
 const analogsLoading = ref(false);
 
 const isDrawing = ref(false);
+const isEditing = ref(false);
 const polygonPoints = ref([]);
-const activePolygon = ref(null);
-const showPolygonSidebar = ref(false);
+const polygons = ref([]);
+const editingPolygonId = ref(null);
 const showFilterResultsSidebar = ref(false);
 const showResultsTable = ref(false);
 const drawingEnabledAt = ref(0);
@@ -230,37 +252,46 @@ const heatmapOptions = computed(() => {
 
 const hasFilters = computed(() => hasActiveFiltersUtil(filters.value));
 
-const resultsSidebarMode = computed(() => (showPolygonSidebar.value ? 'polygon' : 'filters'));
+const selectedPolygons = computed(() =>
+  polygons.value.filter((polygon) => polygon.selected && polygon.points.length >= 3)
+);
+
+const isPolygonModeActive = computed(() => selectedPolygons.value.length > 0);
+
+const resultsSidebarMode = computed(() => (isPolygonModeActive.value ? 'polygon' : 'filters'));
 
 const isResultsSidebarOpen = computed(() => {
   if (showResultsTable.value || selectedBuilding.value || flatsLoadFailed.value) return false;
-  if (showPolygonSidebar.value) return true;
+  if (isPolygonModeActive.value) return true;
   return showFilterResultsSidebar.value && hasFilters.value && flatsLoadedOnce.value;
 });
 
 const resultsTableTitle = computed(() =>
-  showPolygonSidebar.value ? 'Объекты в полигоне' : 'Результаты фильтрации'
+  isPolygonModeActive.value ? 'Объекты в полигонах' : 'Результаты фильтрации'
+);
+
+const vertexPoints = computed(() => {
+  if (isDrawing.value) return polygonPoints.value;
+  if (isEditing.value && editingPolygonId.value) {
+    const polygon = polygons.value.find((item) => item.id === editingPolygonId.value);
+    return polygon?.points || [];
+  }
+  return [];
+});
+
+const closedSelectedRings = computed(() =>
+  selectedPolygons.value.map((polygon) => closeRing(polygon.points)).filter(Boolean)
 );
 
 const tableRows = computed(() => displayFlats.value.map((flat) => buildFlatTableRow(flat)));
 
-const closedPolygon = computed(() => {
-  if (!activePolygon.value || activePolygon.value.length < 3) return null;
-  const points = [...activePolygon.value];
-  const [firstLng, firstLat] = points[0];
-  const [lastLng, lastLat] = points[points.length - 1];
-  if (firstLng !== lastLng || firstLat !== lastLat) {
-    points.push([firstLng, firstLat]);
-  }
-  return points;
-});
-
 const filteredFlats = computed(() => applyFiltersToFlats(flats.value, filters.value));
 
 const displayFlats = computed(() => {
-  if (!closedPolygon.value) return filteredFlats.value;
-  return filteredFlats.value.filter((flat) =>
-    flat.center ? isPointInside(flat.center, closedPolygon.value) : false
+  if (!closedSelectedRings.value.length) return filteredFlats.value;
+  return filteredFlats.value.filter(
+    (flat) =>
+      flat.center && closedSelectedRings.value.some((ring) => isPointInside(flat.center, ring))
   );
 });
 
@@ -443,6 +474,20 @@ onMounted(() => {
   loadCityData();
 });
 
+async function seedDistrictFavoritesForCity() {
+  const city = selectedCity.value;
+  if (!city?.id || isDistrictsSeeded(city.id)) return;
+
+  try {
+    const districtFavorites = await buildDistrictFavoritesForCity(city);
+    if (!districtFavorites.length) return;
+    favorites.value = mergeDistrictFavorites(favorites.value, districtFavorites, city.id);
+    markDistrictsSeeded(city.id);
+  } catch (error) {
+    console.warn('Failed to seed district favorites', error);
+  }
+}
+
 async function loadCityData() {
   if (!selectedCity.value?.id) {
     toast.add({
@@ -454,7 +499,9 @@ async function loadCityData() {
     return;
   }
 
-  await Promise.all([loadBuildings(), loadFlats()]);
+  await loadBuildings();
+  await seedDistrictFavoritesForCity();
+  await loadFlats();
 }
 
 async function loadBuildings() {
@@ -583,7 +630,10 @@ function buildFilterPayload() {
     maxPrice,
     minSQM: 0,
     maxSQM: 0,
-    GeoPoint: activePolygon.value ? serializeGeoPoints(activePolygon.value) : '',
+    GeoPoint:
+      selectedPolygons.value.length === 1
+        ? serializeGeoPoints(selectedPolygons.value[0].points)
+        : '',
     Limit: limit,
   };
 }
@@ -726,10 +776,9 @@ function toggleDrawing() {
     return;
   }
 
+  stopEditingPolygon();
   isDrawing.value = true;
   polygonPoints.value = [];
-  activePolygon.value = null;
-  showPolygonSidebar.value = false;
   showFilterResultsSidebar.value = false;
   showResultsTable.value = false;
   drawingEnabledAt.value = Date.now();
@@ -739,22 +788,124 @@ function handleAddPoint(point) {
   polygonPoints.value = [...polygonPoints.value, point];
 }
 
-function finishPolygon() {
-  if (polygonPoints.value.length < 3) return;
-  activePolygon.value = [...polygonPoints.value];
-  polygonPoints.value = [];
-  isDrawing.value = false;
-  showPolygonSidebar.value = true;
+function handleUpdateVertex({ index, coordinates, commit = true }) {
+  if (!Array.isArray(coordinates) || coordinates.length !== 2) return;
+
+  if (isDrawing.value) {
+    const next = [...polygonPoints.value];
+    if (!next[index]) return;
+    next[index] = coordinates;
+    polygonPoints.value = next;
+    return;
+  }
+
+  if (!editingPolygonId.value) return;
+  const polygonIndex = polygons.value.findIndex((item) => item.id === editingPolygonId.value);
+  if (polygonIndex < 0) return;
+
+  const nextPoints = [...polygons.value[polygonIndex].points];
+  if (!nextPoints[index]) return;
+  nextPoints[index] = coordinates;
+  polygons.value[polygonIndex] = {
+    ...polygons.value[polygonIndex],
+    points: nextPoints,
+  };
+
+  if (commit) {
+    loadFlats('polygon');
+  }
+}
+
+function handleMapClick(coords) {
+  const hitCandidates = polygons.value
+    .filter((polygon) => polygon.points.length >= 3)
+    .map((polygon) => ({ id: polygon.id, ring: closeRing(polygon.points) }))
+    .filter((item) => item.ring);
+
+  for (let index = hitCandidates.length - 1; index >= 0; index -= 1) {
+    const candidate = hitCandidates[index];
+    if (isPointInside(coords, candidate.ring)) {
+      togglePolygonSelection(candidate.id);
+      return;
+    }
+  }
+}
+
+function togglePolygonSelection(polygonId) {
+  const polygonIndex = polygons.value.findIndex((item) => item.id === polygonId);
+  if (polygonIndex < 0) return;
+  polygons.value[polygonIndex] = {
+    ...polygons.value[polygonIndex],
+    selected: !polygons.value[polygonIndex].selected,
+  };
   showFilterResultsSidebar.value = false;
   showResultsTable.value = false;
   selectedBuilding.value = null;
   loadFlats('polygon');
 }
 
+function startEditingPolygon(polygonId) {
+  const polygon = polygons.value.find((item) => item.id === polygonId);
+  if (!polygon || polygon.points.length < 3) return;
+  isDrawing.value = false;
+  polygonPoints.value = [];
+  isEditing.value = true;
+  editingPolygonId.value = polygonId;
+}
+
+function stopEditingPolygon() {
+  isEditing.value = false;
+  editingPolygonId.value = null;
+}
+
+function removePolygon(polygonId) {
+  polygons.value = polygons.value.filter((item) => item.id !== polygonId);
+  if (editingPolygonId.value === polygonId) {
+    stopEditingPolygon();
+  }
+  loadFlats(polygons.value.some((item) => item.selected) ? 'polygon' : 'filters');
+}
+
+function applyFavoritePolygon(favorite) {
+  const mapPolygon = favoriteToMapPolygon(favorite);
+  if (!mapPolygon) return;
+
+  const existingIndex = polygons.value.findIndex((item) => item.presetId === favorite.id);
+  if (existingIndex >= 0) {
+    polygons.value[existingIndex] = {
+      ...polygons.value[existingIndex],
+      selected: !polygons.value[existingIndex].selected,
+    };
+  } else {
+    polygons.value.push(mapPolygon);
+  }
+}
+
+function finishPolygon() {
+  if (polygonPoints.value.length < 3) return;
+
+  const polygon = {
+    id: createPolygonId(),
+    name: 'Новый полигон',
+    points: [...polygonPoints.value],
+    selected: true,
+    isDistrict: false,
+  };
+
+  polygons.value.push(polygon);
+  polygonPoints.value = [];
+  isDrawing.value = false;
+  showFilterResultsSidebar.value = false;
+  showResultsTable.value = false;
+  selectedBuilding.value = null;
+  startEditingPolygon(polygon.id);
+  loadFlats('polygon');
+}
+
 function closeResultsSidebar() {
-  if (showPolygonSidebar.value) {
-    showPolygonSidebar.value = false;
-    activePolygon.value = null;
+  if (isPolygonModeActive.value) {
+    polygons.value = polygons.value.map((polygon) => ({ ...polygon, selected: false }));
+    stopEditingPolygon();
     loadFlats();
     return;
   }
@@ -771,16 +922,24 @@ function closeResultsTable() {
 }
 
 async function handleSavePolygon(name) {
-  if (!activePolygon.value?.length) return;
+  const polygonToSave =
+    (editingPolygonId.value && polygons.value.find((item) => item.id === editingPolygonId.value)) ||
+    selectedPolygons.value[0];
+
+  if (!polygonToSave?.points?.length) return;
 
   const favorite = {
     id: `fav_${Date.now()}`,
     name,
     filters: { ...filters.value },
-    geoPoints: [...activePolygon.value],
+    geoPoints: [...polygonToSave.points],
     cityId: selectedCity.value?.id || null,
     source: 'local',
+    isDistrict: false,
   };
+
+  polygonToSave.presetId = favorite.id;
+  polygonToSave.name = name;
 
   favorites.value = [favorite, ...favorites.value];
   toast.add({ severity: 'success', summary: 'Избранное', detail: 'Полигон сохранен', life: 3000 });
@@ -813,13 +972,10 @@ function handleSelectFavorite(favorite) {
   let reason = 'filters';
 
   if (hasPolygon) {
-    activePolygon.value = [...favorite.geoPoints];
-    showPolygonSidebar.value = true;
+    applyFavoritePolygon(favorite);
     showFilterResultsSidebar.value = false;
     reason = 'polygon';
   } else {
-    activePolygon.value = null;
-    showPolygonSidebar.value = false;
     showFilterResultsSidebar.value = hasFilterConfig;
   }
 
@@ -895,9 +1051,10 @@ async function syncFavorites() {
 function resetMapState() {
   selectedBuilding.value = null;
   selectedFlat.value = null;
-  activePolygon.value = null;
+  polygons.value = [];
   polygonPoints.value = [];
-  showPolygonSidebar.value = false;
+  isDrawing.value = false;
+  stopEditingPolygon();
   showFilterResultsSidebar.value = false;
   showResultsTable.value = false;
   heatMode.value = null;

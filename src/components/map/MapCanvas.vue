@@ -41,7 +41,7 @@
       v-else-if="canRenderMap"
       v-model="map"
       class="map-canvas__map"
-      :class="{ 'map-canvas__map--drawing': isDrawing }"
+      :class="{ 'map-canvas__map--drawing': isDrawing || isEditing }"
       :settings="mapSettings"
       width="100%"
       height="100%"
@@ -53,8 +53,18 @@
 
         <HeatmapLayer v-if="heatMode && !isDrawing" :points="heatPoints" />
 
+        <PolygonEditorLayer
+          :map-ready="mapReady"
+          :polygons="polygons"
+          :vertex-points="vertexPoints"
+          :is-drawing="isDrawing"
+          :is-editing="isEditing"
+          @vertex-click="emit('vertex-click', $event)"
+          @update-vertex="emit('update-vertex', $event)"
+        />
+
         <YandexMapClusterer
-          v-if="!isDrawing && visibleBuildings.length"
+          v-if="!isDrawing && !isEditing && visibleBuildings.length"
           zoom-on-cluster-click
           :grid-size="64"
           :settings="{ maxZoom: 17 }"
@@ -85,9 +95,6 @@
         >
           <div class="analog-marker" :class="{ 'analog-marker--disabled': isDrawing }"></div>
         </YandexMapMarker>
-
-        <YandexMapFeature v-if="savedFeature" :settings="savedFeature" />
-        <YandexMapFeature v-if="drawingFeature" :settings="drawingFeature" />
       </template>
     </YandexMap>
 
@@ -112,9 +119,9 @@ import {
   YandexMapClusterer,
   YandexMapListener,
   YandexMapMarker,
-  YandexMapFeature,
 } from 'vue-yandex-maps';
 import HeatmapLayer from './HeatmapLayer.vue';
+import PolygonEditorLayer from './PolygonEditorLayer.vue';
 import FloatControls from '../toolbar/FloatControls.vue';
 import { isValidCenter } from '@/utils/geo';
 
@@ -163,11 +170,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  polygonPoints: {
+  isEditing: {
+    type: Boolean,
+    default: false,
+  },
+  polygons: {
     type: Array,
     default: () => [],
   },
-  savedPolygon: {
+  vertexPoints: {
     type: Array,
     default: () => [],
   },
@@ -189,7 +200,15 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['building-click', 'add-point', 'favorites', 'toggle-drawing']);
+const emit = defineEmits([
+  'building-click',
+  'add-point',
+  'map-click',
+  'vertex-click',
+  'update-vertex',
+  'favorites',
+  'toggle-drawing',
+]);
 
 // vue-yandex-maps expects v-model value to be stored in shallowRef
 const map = shallowRef(null);
@@ -334,27 +353,24 @@ onBeforeUnmount(() => {
   stopProgressAnimation();
 });
 
-const drawingFeature = computed(() =>
-  buildPolygonFeature(props.polygonPoints, '#ff001e', 'rgba(255, 0, 30, 0.15)')
-);
-
-const savedFeature = computed(() =>
-  buildPolygonFeature(props.savedPolygon, '#3b82f6', 'rgba(59, 130, 246, 0.12)')
-);
-
 const listenerSettings = computed(() => ({
   onUpdate: (event) => {
     const zoom = event?.location?.zoom;
     if (Number.isFinite(zoom)) currentZoom.value = Math.round(zoom);
   },
   onClick: (object, event) => {
-    if (!props.isDrawing) return;
-    // Ignore clicks right after enabling drawing (pencil button click on map).
-    if (Date.now() - props.drawingEnabledAt < 300) return;
     const coords = extractCoordinates(event) || extractCoordinates(object);
-    if (coords) {
+    if (!coords) return;
+
+    if (props.isDrawing) {
+      // Ignore clicks right after enabling drawing (pencil button click on map).
+      if (Date.now() - props.drawingEnabledAt < 300) return;
       emit('add-point', coords);
+      return;
     }
+
+    if (props.isEditing) return;
+    emit('map-click', coords);
   },
 }));
 
@@ -389,27 +405,6 @@ function handleZoomIn() {
 function handleZoomOut() {
   const nextZoom = Math.max(3, (currentZoom.value || mapLocation.value.zoom || 12) - 1);
   flyTo(mapLocation.value.center, nextZoom);
-}
-
-function buildPolygonFeature(points, strokeColor, fillColor) {
-  if (!Array.isArray(points) || points.length < 3) return null;
-  const closed = [...points];
-  const [firstLng, firstLat] = closed[0];
-  const [lastLng, lastLat] = closed[closed.length - 1];
-  if (firstLng !== lastLng || firstLat !== lastLat) {
-    closed.push([firstLng, firstLat]);
-  }
-
-  return {
-    geometry: {
-      type: 'Polygon',
-      coordinates: [closed],
-    },
-    style: {
-      fill: fillColor,
-      stroke: [{ color: strokeColor, width: 2 }],
-    },
-  };
 }
 </script>
 
