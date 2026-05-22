@@ -11,24 +11,24 @@
         <div>
           <p class="detail-modal__address">
             <i class="pi pi-map-marker"></i>
-            {{ flat.address || 'Без адреса' }}
+            {{ display.address || 'Без адреса' }}
           </p>
           <p class="detail-modal__meta">
-            {{ flat.rooms }}-комн. · {{ flat.area }} м² · Этаж {{ flat.floor }}
+            {{ display.rooms }}-комн. · {{ display.area }} м² · Этаж {{ display.floor }}
           </p>
           <p class="detail-modal__status">
             <i class="pi pi-calendar"></i>
             {{ statusText }}
           </p>
         </div>
-        <Tag severity="secondary">{{ sourceLabel }}</Tag>
+        <Tag severity="secondary">{{ display.sourceLabel }}</Tag>
       </div>
 
       <div class="detail-modal__prices">
         <div class="detail-modal__price-card">
           <span>Текущая цена</span>
-          <strong>{{ formatCompactPrice(flat.price) }}</strong>
-          <small>{{ formatPricePerSqm(flat.sqm) }}</small>
+          <strong>{{ formatCompactPrice(display.price) }}</strong>
+          <small>{{ formatPricePerSqm(display.sqm) }}</small>
         </div>
         <div class="detail-modal__price-card detail-modal__price-card--accent">
           <span>Прогнозная оценка</span>
@@ -37,35 +37,66 @@
             <i :class="predictionTrend.icon"></i>
             <small>{{ predictionTrend.label }}</small>
           </div>
+          <small v-else-if="loadingPrediction">Загрузка...</small>
           <small v-else>Нет данных</small>
         </div>
       </div>
 
-      <div class="detail-modal__grid">
+      <div v-if="loadingDetails" class="detail-modal__loading">
+        <ProgressSpinner style="width: 36px; height: 36px" />
+        <p>Загружаем данные объекта...</p>
+      </div>
+
+      <div v-else class="detail-modal__grid">
         <div class="detail-modal__cell">
           <span>Площадь</span>
-          <strong>{{ flat.area }} м²</strong>
+          <strong>{{ display.area }} м²</strong>
         </div>
         <div class="detail-modal__cell">
           <span>Комнат</span>
-          <strong>{{ flat.rooms }}</strong>
+          <strong>{{ display.rooms }}</strong>
         </div>
         <div class="detail-modal__cell">
           <span>Этаж</span>
-          <strong>{{ flat.floor }}</strong>
+          <strong>{{ display.floor }}</strong>
         </div>
         <div class="detail-modal__cell">
-          <span>Цена / м²</span>
-          <strong>{{ formatPricePerSqm(flat.sqm) }}</strong>
+          <span>Кухня</span>
+          <strong>{{ kitchenLabel }}</strong>
+        </div>
+        <div class="detail-modal__cell">
+          <span>Год постройки</span>
+          <strong>{{ display.buildYear ?? '—' }}</strong>
+        </div>
+        <div class="detail-modal__cell">
+          <span>Материал</span>
+          <strong>{{ display.material || '—' }}</strong>
+        </div>
+        <div class="detail-modal__cell">
+          <span>Отделка</span>
+          <strong>{{ display.finishing || '—' }}</strong>
+        </div>
+        <div class="detail-modal__cell">
+          <span>Балкон</span>
+          <strong>{{ display.hasBalcony ? 'Есть' : 'Нет' }}</strong>
+        </div>
+        <div class="detail-modal__cell detail-modal__cell--wide">
+          <span>Метро</span>
+          <strong>{{ metroLabel }}</strong>
         </div>
       </div>
 
-      <div v-if="loadingPrediction" class="detail-modal__loading">
-        <ProgressSpinner style="width: 36px; height: 36px" />
-        <p>Получаем прогноз...</p>
+      <div v-if="prediction?.recommendation" class="detail-modal__recommendation">
+        <span>Рекомендация</span>
+        <p>{{ prediction.recommendation }}</p>
+        <small v-if="prediction.status">{{ prediction.status }}</small>
       </div>
 
-      <AnalogSlider v-if="analogs.length" :analogs="analogs" />
+      <AnalogSlider
+        :analogs="analogs"
+        :loading="loadingAnalogs"
+        @select="emit('select-analog', $event)"
+      />
     </div>
   </Dialog>
 </template>
@@ -77,11 +108,24 @@ import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
 import AnalogSlider from './AnalogSlider.vue';
 import { formatCompactPrice, formatPricePerSqm } from '@/utils/formatters';
+import { getFlatStatusLabel, getSourceLabel, formatFlatDate } from '@/utils/flatLabels';
 
 const props = defineProps({
   flat: {
     type: Object,
     default: null,
+  },
+  flatDetails: {
+    type: Object,
+    default: null,
+  },
+  closestMetro: {
+    type: Array,
+    default: () => [],
+  },
+  loadingDetails: {
+    type: Boolean,
+    default: false,
   },
   prediction: {
     type: Object,
@@ -95,9 +139,17 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  analogs: {
+    type: Array,
+    default: () => [],
+  },
+  loadingAnalogs: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'select-analog']);
 
 const visible = computed({
   get: () => props.open,
@@ -106,12 +158,48 @@ const visible = computed({
   },
 });
 
-const sourceLabel = computed(() => {
-  const map = { cian: 'Циан', domclick: 'Домклик', avito: 'Авито' };
-  const source = String(props.flat?.source || '')
-    .trim()
-    .toLowerCase();
-  return map[source] || props.flat?.source || 'Источник';
+const display = computed(() => {
+  const base = props.flat || {};
+  const details = props.flatDetails || {};
+  const price = details.price ?? base.price ?? 0;
+  const area = details.area ?? base.area ?? 0;
+
+  return {
+    address: details.address || base.address || '',
+    price,
+    area,
+    floor: details.floor ?? base.floor ?? 0,
+    rooms: details.rooms ?? base.rooms ?? 0,
+    kitchenArea: details.kitchenArea ?? 0,
+    buildYear: details.buildYear ?? null,
+    material: details.material ?? '',
+    hasBalcony: details.hasBalcony ?? false,
+    finishing: details.finishing ?? '',
+    publicationDate: details.publicationDate ?? base.publishedAt ?? null,
+    source: details.source || base.source || '',
+    sourceLabel: details.sourceLabel || getSourceLabel(details.source || base.source),
+    metro: details.metro ?? null,
+    sqm: details.sqm ?? base.sqm ?? (area > 0 && price > 0 ? price / area : 0),
+  };
+});
+
+const kitchenLabel = computed(() => {
+  const value = display.value.kitchenArea;
+  if (!Number.isFinite(value) || value <= 0) return '—';
+  return `${value} м²`;
+});
+
+const metroLabel = computed(() => {
+  if (display.value.metro) return display.value.metro;
+  if (!props.closestMetro?.length) return '—';
+  return props.closestMetro
+    .map((station) => {
+      if (station.distanceKm != null) {
+        return `${station.name} (${station.distanceKm.toFixed(1)} км)`;
+      }
+      return station.name;
+    })
+    .join(' · ');
 });
 
 const predictedLabel = computed(() => {
@@ -137,53 +225,10 @@ const predictionTrendClass = computed(() => {
 });
 
 const statusText = computed(() => {
-  const publishedAt = toDate(props.flat?.publishedAt);
-  const dateLabel = publishedAt ? formatDate(publishedAt) : 'Дата не указана';
-  return `Опубликовано ${dateLabel} · ${getStatusLabel(props.flat)}`;
+  const publishedAt = display.value.publicationDate;
+  const dateLabel = publishedAt ? formatFlatDate(publishedAt) : 'Дата не указана';
+  return `Опубликовано ${dateLabel} · ${getFlatStatusLabel(props.flat)}`;
 });
-
-const analogs = computed(() => {
-  const list = props.prediction?.similarFlats || [];
-  return list.map((item) => ({
-    id: item.flatId || item.FlatId || item.id,
-    rooms: item.rooms || item.Rooms || 0,
-    area: item.area || item.Area || 0,
-    floor: item.floor || item.Floor || 0,
-    price: item.price || item.Price || 0,
-    similarity: item.similarityScore || item.SimilarityScore || 0,
-    address: item.address || item.Address || 'Без адреса',
-    pricePerSqm: formatPricePerSqm(item.pricePerSqm || item.PricePerSqm || 0),
-  }));
-});
-
-function getStatusLabel(flat) {
-  if (!flat) return 'Активна';
-  if (flat.unpublishedAt) return 'Снято с публикации';
-
-  const rawStatus = flat.status ?? flat.Status ?? flat.FlatStatus ?? flat.flatStatus;
-  const normalized = typeof rawStatus === 'string' ? rawStatus.trim().toLowerCase() : rawStatus;
-
-  if (normalized === 3 || normalized === 'продано') return 'Продано';
-  if (normalized === 1 || normalized === 'в_архиве' || normalized === 'архив') {
-    return 'Снято с публикации';
-  }
-
-  return 'Активна';
-}
-
-function toDate(value) {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatDate(date) {
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
-}
 </script>
 
 <style scoped>
@@ -287,9 +332,39 @@ function formatDate(date) {
   gap: 2px;
 }
 
+.detail-modal__cell--wide {
+  grid-column: 1 / -1;
+}
+
 .detail-modal__cell span {
   font-size: 0.7rem;
   color: var(--app-muted-foreground);
+}
+
+.detail-modal__recommendation {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--app-border);
+  background: rgba(248, 243, 236, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-modal__recommendation span {
+  font-size: 0.7rem;
+  color: var(--app-muted-foreground);
+}
+
+.detail-modal__recommendation p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.detail-modal__recommendation small {
+  color: var(--app-muted-foreground);
+  font-size: 0.75rem;
 }
 
 .detail-modal__loading {

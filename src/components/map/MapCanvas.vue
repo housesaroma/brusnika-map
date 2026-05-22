@@ -51,17 +51,17 @@
       <template v-if="mapReady">
         <YandexMapListener :settings="listenerSettings" />
 
-        <HeatmapLayer v-if="heatMode" :points="heatPoints" />
+        <HeatmapLayer v-if="heatMode && !isDrawing" :points="heatPoints" />
 
         <YandexMapClusterer
-          v-if="!isDrawing"
+          v-if="!isDrawing && visibleBuildings.length"
           zoom-on-cluster-click
           :grid-size="64"
           :settings="{ maxZoom: 17 }"
         >
           <YandexMapMarker
             v-for="building in visibleBuildings"
-            :key="building.id"
+            :key="building.markerKey"
             :settings="{ coordinates: building.center }"
             @click="emit('building-click', building)"
           >
@@ -75,20 +75,6 @@
             <div class="cluster-marker">{{ length }}</div>
           </template>
         </YandexMapClusterer>
-
-        <template v-else>
-          <YandexMapMarker
-            v-for="building in visibleBuildings"
-            :key="building.id"
-            :container-attrs="{ style: { pointerEvents: 'none' } }"
-            :settings="{ coordinates: building.center }"
-          >
-            <div class="building-dot building-dot--disabled">
-              <i class="pi pi-building"></i>
-              <span>{{ building.flatCount || 0 }}</span>
-            </div>
-          </YandexMapMarker>
-        </template>
 
         <YandexMapMarker
           v-for="flat in analogFlats"
@@ -118,6 +104,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from 'vue';
+import { withBuildingMarkerKeys } from '@/utils/buildings';
 import {
   YandexMap,
   YandexMapDefaultSchemeLayer,
@@ -270,7 +257,7 @@ watchEffect(() => {
 });
 
 const visibleBuildings = computed(() =>
-  props.buildings.filter((building) => isValidCenter(building.center))
+  withBuildingMarkerKeys(props.buildings.filter((building) => isValidCenter(building.center)))
 );
 const loadingTitle = computed(() => {
   if (props.loadingPhase === 'buildings') return 'Загружаем объекты карты...';
@@ -355,19 +342,21 @@ const savedFeature = computed(() =>
   buildPolygonFeature(props.savedPolygon, '#3b82f6', 'rgba(59, 130, 246, 0.12)')
 );
 
-const listenerSettings = {
+const listenerSettings = computed(() => ({
   onUpdate: (event) => {
     const zoom = event?.location?.zoom;
     if (Number.isFinite(zoom)) currentZoom.value = Math.round(zoom);
   },
   onClick: (object, event) => {
     if (!props.isDrawing) return;
+    // Ignore clicks right after enabling drawing (pencil button click on map).
+    if (Date.now() - props.drawingEnabledAt < 300) return;
     const coords = extractCoordinates(event) || extractCoordinates(object);
     if (coords) {
       emit('add-point', coords);
     }
   },
-};
+}));
 
 function extractCoordinates(event) {
   if (Array.isArray(event?.coordinates)) return event.coordinates;

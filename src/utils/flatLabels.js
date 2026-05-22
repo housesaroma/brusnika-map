@@ -22,7 +22,11 @@ export function getSourceLabel(source) {
   const normalized = String(source || '')
     .trim()
     .toLowerCase();
-  return map[normalized] || source || 'Источник';
+  if (map[normalized]) return map[normalized];
+  if (normalized) {
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  }
+  return 'Источник';
 }
 
 export function formatFlatDate(value) {

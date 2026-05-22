@@ -1,15 +1,28 @@
 <template>
-  <div v-if="analogs.length" class="analog-slider">
+  <section class="analog-slider">
     <div class="analog-slider__header">
-      <h4>Аналоги ({{ analogs.length }})</h4>
-      <div class="analog-slider__buttons">
+      <h4>Аналоги{{ analogs.length ? ` (${analogs.length})` : '' }}</h4>
+      <div v-if="analogs.length" class="analog-slider__buttons">
         <Button icon="pi pi-angle-left" text rounded @click="scroll(-1)" />
         <Button icon="pi pi-angle-right" text rounded @click="scroll(1)" />
       </div>
     </div>
 
-    <div ref="scrollRef" class="analog-slider__list">
-      <div v-for="analog in analogs" :key="analog.id" class="analog-card">
+    <div v-if="loading" class="analog-slider__loading">
+      <ProgressSpinner style="width: 28px; height: 28px" />
+      <span>Загружаем аналоги...</span>
+    </div>
+
+    <p v-else-if="!analogs.length" class="analog-slider__empty">Аналоги не найдены</p>
+
+    <div v-else ref="scrollRef" class="analog-slider__list">
+      <button
+        v-for="analog in analogs"
+        :key="analog.id"
+        type="button"
+        class="analog-card"
+        @click="emit('select', analog)"
+      >
         <div class="analog-card__header">
           <p>{{ analog.rooms }}-комн. · {{ analog.area }} м²</p>
           <Tag v-if="analog.similarity" severity="secondary">
@@ -25,15 +38,17 @@
           <span v-if="analog.pricePerSqm">• {{ analog.pricePerSqm }}</span>
         </p>
         <p class="analog-card__price">{{ formatCompactPrice(analog.price) }}</p>
-      </div>
+        <span class="analog-card__hint">Открыть карточку</span>
+      </button>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
 import { ref } from 'vue';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
+import ProgressSpinner from 'primevue/progressspinner';
 import { formatCompactPrice } from '@/utils/formatters';
 
 defineProps({
@@ -41,7 +56,13 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 });
+
+const emit = defineEmits(['select']);
 
 const scrollRef = ref(null);
 
@@ -80,6 +101,21 @@ function scroll(direction) {
   margin-top: 10px;
 }
 
+.analog-slider__loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: var(--app-muted-foreground);
+}
+
+.analog-slider__empty {
+  margin: 10px 0 0;
+  font-size: 0.75rem;
+  color: var(--app-muted-foreground);
+}
+
 .analog-card {
   min-width: 220px;
   max-width: 220px;
@@ -87,6 +123,26 @@ function scroll(direction) {
   border-radius: 14px;
   padding: 12px;
   background: rgba(242, 236, 230, 0.4);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.analog-card:hover {
+  border-color: rgba(255, 0, 30, 0.45);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.1);
+  transform: translateY(-1px);
+}
+
+.analog-card__hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.65rem;
+  color: var(--app-primary);
+  font-weight: 600;
 }
 
 .analog-card__header {

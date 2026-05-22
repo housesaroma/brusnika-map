@@ -14,7 +14,7 @@
         </div>
       </div>
       <div class="left-nav__count">{{ totalFlats }} объектов на карте</div>
-      <Dropdown
+      <Select
         v-if="cityOptions.length > 1"
         :model-value="selectedCity"
         :options="cityOptions"
@@ -78,7 +78,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 
 const props = defineProps({
   totalFlats: {

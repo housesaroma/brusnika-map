@@ -35,7 +35,7 @@
         <div class="valuation-modal__grid">
           <div class="field">
             <label>Комнат</label>
-            <Dropdown v-model="params.rooms" :options="roomOptions" />
+            <Select v-model="params.rooms" :options="roomOptions" />
           </div>
           <div class="field">
             <label>Общая площадь (м²)</label>
@@ -57,7 +57,7 @@
         <div class="valuation-modal__grid">
           <div class="field">
             <label>Материал дома</label>
-            <Dropdown
+            <Select
               v-model="params.material"
               :options="materialOptions"
               option-label="label"
@@ -66,7 +66,7 @@
           </div>
           <div class="field">
             <label>Ремонт</label>
-            <Dropdown
+            <Select
               v-model="params.renovation"
               :options="renovationOptions"
               option-label="label"
@@ -98,7 +98,7 @@ import { ref, computed } from 'vue';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
+import Select from 'primevue/select';
 import InputSwitch from 'primevue/inputswitch';
 import AnalogSlider from './AnalogSlider.vue';
 import StepLoader from './StepLoader.vue';

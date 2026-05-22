@@ -83,17 +83,22 @@
     <PropertyDetailModal
       :open="showDetailModal"
       :flat="selectedFlat"
+      :flat-details="flatDetails"
+      :closest-metro="closestMetro"
+      :loading-details="flatDetailsLoading"
       :prediction="prediction"
       :loading-prediction="predictionLoading"
-      @close="showDetailModal = false"
+      :analogs="flatAnalogs"
+      :loading-analogs="analogsLoading"
+      @close="closeDetailModal"
+      @select-analog="handleAnalogSelect"
     />
 
     <ValuationModal :open="showValuation" @close="showValuation = false" />
 
     <FiltersModal
-      :open="showFilters"
+      v-model:open="showFilters"
       :current-filters="filters"
-      @close="showFilters = false"
       @apply="handleApplyFilters"
     />
 
@@ -124,6 +129,7 @@ import FiltersModal from '@/components/modals/FiltersModal.vue';
 import FavoritesModal from '@/components/modals/FavoritesModal.vue';
 
 import mapApi from '@/api/map';
+import { findClosestMetro } from '@/api/geocoder';
 import savedApi from '@/api/saved';
 import predictionsApi from '@/api/predictions';
 
@@ -142,7 +148,9 @@ import { getHeatValue, normalizeHeatValues } from '@/utils/heatmap';
 import { favoriteToServerPayload, normalizeFavorite } from '@/utils/favorites';
 import { usePointInPolygon } from '@/composables/usePointInPolygon';
 import { loadBuildingsCache, saveBuildingsCache } from '@/utils/buildingsCache';
-import { normalizePrediction } from '@/utils/prediction';
+import { dedupeBuildings, withBuildingMarkerKeys } from '@/utils/buildings';
+import { normalizePrediction, normalizeAnalogList, analogToFlatStub } from '@/utils/prediction';
+import { normalizeFlatDetails } from '@/utils/normalizeFlatDetails';
 import { buildFlatTableRow } from '@/utils/flatTable';
 
 const toast = useToast();
@@ -180,6 +188,11 @@ const showFavorites = ref(false);
 
 const prediction = ref(null);
 const predictionLoading = ref(false);
+const flatDetails = ref(null);
+const flatDetailsLoading = ref(false);
+const closestMetro = ref([]);
+const flatAnalogs = ref([]);
+const analogsLoading = ref(false);
 
 const isDrawing = ref(false);
 const polygonPoints = ref([]);
@@ -265,7 +278,7 @@ const displayBuildings = computed(() => {
 
   const canUseFlatsForCounts = flatsLoadedOnce.value && !flatsLoadFailed.value;
 
-  return buildings.value
+  const mapped = buildings.value
     .map((building) => ({
       ...building,
       flatCount: canUseFlatsForCounts
@@ -273,6 +286,8 @@ const displayBuildings = computed(() => {
         : building.flatCount || 0,
     }))
     .filter((building) => building.flatCount > 0);
+
+  return withBuildingMarkerKeys(mapped);
 });
 
 const selectedBuildingFlats = computed(() => {
@@ -448,9 +463,10 @@ async function loadBuildings() {
 
   const cached = loadBuildingsCache(cityId);
   if (cached?.buildings?.length) {
-    buildings.value = cached.buildings;
-    buildingsLoaded.value = cached.buildings.length;
-    buildingsTotal.value = cached.buildings.length;
+    const cachedBuildings = dedupeBuildings(cached.buildings);
+    buildings.value = cachedBuildings;
+    buildingsLoaded.value = cachedBuildings.length;
+    buildingsTotal.value = cachedBuildings.length;
 
     // If cache is still fresh, skip network completely.
     if (cached.isFresh) {
@@ -484,8 +500,9 @@ async function loadBuildings() {
     } while (nextBuildings.length < total);
 
     // Important: assign once to avoid massive child-patching while map initializes.
-    buildings.value = nextBuildings;
-    saveBuildingsCache(cityId, nextBuildings);
+    const uniqueBuildings = dedupeBuildings(nextBuildings);
+    buildings.value = uniqueBuildings;
+    saveBuildingsCache(cityId, uniqueBuildings);
   } catch (error) {
     console.error(error);
     toast.add({
@@ -596,9 +613,83 @@ function clearBuildingSelection() {
 }
 
 function handleFlatClick(flat) {
+  if (!flat?.id) return;
+
   selectedFlat.value = flat;
   showDetailModal.value = true;
+  flatDetails.value = null;
+  closestMetro.value = [];
+  flatAnalogs.value = [];
+  fetchFlatDetails(flat);
   fetchPrediction(flat.id);
+  fetchAnalogs(flat.id);
+}
+
+function handleAnalogSelect(analog) {
+  const flat = analogToFlatStub(analog);
+  if (!flat?.id) return;
+  handleFlatClick(flat);
+}
+
+function closeDetailModal() {
+  showDetailModal.value = false;
+  flatDetails.value = null;
+  closestMetro.value = [];
+  flatAnalogs.value = [];
+}
+
+async function fetchAnalogs(flatId) {
+  if (!flatId) return;
+
+  analogsLoading.value = true;
+  flatAnalogs.value = [];
+
+  try {
+    const { data } = await predictionsApi.getFlatAnalogs(flatId);
+    flatAnalogs.value = normalizeAnalogList(data);
+  } catch (error) {
+    console.error(error);
+    toast.add({
+      severity: 'warn',
+      summary: 'Аналоги',
+      detail: 'Не удалось загрузить аналоги.',
+      life: 3000,
+    });
+  } finally {
+    analogsLoading.value = false;
+  }
+}
+
+async function fetchFlatDetails(flat) {
+  if (!flat?.id) return;
+
+  flatDetailsLoading.value = true;
+  flatDetails.value = null;
+  closestMetro.value = [];
+
+  try {
+    const { data } = await mapApi.getFlat(flat.id);
+    const details = normalizeFlatDetails(data);
+    flatDetails.value = details;
+
+    if (!details?.metro && Array.isArray(flat.center) && flat.center.length === 2) {
+      try {
+        closestMetro.value = await findClosestMetro(flat.center, { results: 3, skip: 1 });
+      } catch (metroError) {
+        console.warn('Failed to resolve closest metro', metroError);
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    toast.add({
+      severity: 'warn',
+      summary: 'Квартира',
+      detail: 'Не удалось загрузить детали объекта.',
+      life: 3000,
+    });
+  } finally {
+    flatDetailsLoading.value = false;
+  }
 }
 
 async function fetchPrediction(flatId) {
@@ -617,6 +708,7 @@ async function fetchPrediction(flatId) {
 }
 
 function handleApplyFilters(nextFilters) {
+  showFilters.value = false;
   filters.value = { ...DEFAULT_FILTERS, ...nextFilters };
   saveFilters(filters.value);
   showFilterResultsSidebar.value = hasActiveFiltersUtil(filters.value);
@@ -626,6 +718,8 @@ function handleApplyFilters(nextFilters) {
 }
 
 function toggleDrawing() {
+  showFilters.value = false;
+
   if (isDrawing.value) {
     isDrawing.value = false;
     polygonPoints.value = [];
