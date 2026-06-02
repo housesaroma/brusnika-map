@@ -10,7 +10,10 @@
 
     <div v-if="loading" class="analog-slider__loading">
       <ProgressSpinner style="width: 28px; height: 28px" />
-      <span>Загружаем аналоги...</span>
+      <div class="analog-slider__loading-text">
+        <span>Подбираем аналоги. Это может занять до 60 секунд.</span>
+        <small>Мы продолжаем загрузку, пожалуйста, подождите.</small>
+      </div>
     </div>
 
     <p v-else-if="!analogs.length" class="analog-slider__empty">Аналоги не найдены</p>
@@ -38,7 +41,6 @@
           <span v-if="analog.pricePerSqm">• {{ analog.pricePerSqm }}</span>
         </p>
         <p class="analog-card__price">{{ formatCompactPrice(analog.price) }}</p>
-        <span class="analog-card__hint">Открыть карточку</span>
       </button>
     </div>
   </section>
@@ -107,6 +109,17 @@ function scroll(direction) {
   gap: 8px;
   margin-top: 10px;
   font-size: 0.75rem;
+  color: var(--app-muted-foreground);
+}
+
+.analog-slider__loading-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.analog-slider__loading-text small {
+  font-size: 0.7rem;
   color: var(--app-muted-foreground);
 }
 
