@@ -53,6 +53,7 @@
     </header>
 
     <div class="flats-table-panel__body">
+      <!-- Добавлены resizable-columns и column-resize-mode -->
       <DataTable
         v-model:filters="tableFilters"
         :value="rows"
@@ -69,6 +70,8 @@
         scroll-height="flex"
         striped-rows
         size="small"
+        resizable-columns
+        column-resize-mode="expand"
         class="flats-table-panel__datatable"
         :row-class="rowClass"
         @row-click="handleRowClick"
@@ -80,11 +83,7 @@
               :key="rowIndex"
               class="flats-table-panel__skeleton-row"
             >
-              <Skeleton
-                v-for="cellIndex in skeletonCells"
-                :key="cellIndex"
-                height="14px"
-              />
+              <Skeleton v-for="cellIndex in skeletonCells" :key="cellIndex" height="14px" />
             </div>
           </div>
         </template>
@@ -92,7 +91,14 @@
           <div class="flats-table-panel__empty">Нет объектов для отображения</div>
         </template>
 
-        <Column field="address" header="Адрес" sortable :show-filter-menu="false">
+        <!-- Колонки оптимизированы по ширине для вмещения новых данных -->
+        <Column
+          field="address"
+          header="Адрес"
+          sortable
+          :show-filter-menu="false"
+          style="min-width: 140px"
+        >
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -103,12 +109,36 @@
           </template>
         </Column>
 
-        <Column field="rooms" header="Комнат" sortable data-type="numeric" style="min-width: 90px">
+        <!-- НОВЫЙ ФИЛЬТР: Район -->
+        <Column field="district" header="Район" sortable style="min-width: 100px">
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText
+              v-model="filterModel.value"
+              type="text"
+              placeholder="Район"
+              @input="filterCallback()"
+            />
+          </template>
+        </Column>
+
+        <!-- НОВЫЙ ФИЛЬТР: Полигон -->
+        <Column field="polygon" header="Полигон" sortable style="min-width: 100px">
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText
+              v-model="filterModel.value"
+              type="text"
+              placeholder="Полигон"
+              @input="filterCallback()"
+            />
+          </template>
+        </Column>
+
+        <Column field="rooms" header="Комнат" sortable data-type="numeric" style="min-width: 75px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
               type="number"
-              placeholder="Комнат"
+              placeholder="Кол-во"
               @input="filterCallback()"
             />
           </template>
@@ -119,7 +149,7 @@
           header="Площадь, м²"
           sortable
           data-type="numeric"
-          style="min-width: 110px"
+          style="min-width: 85px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText
@@ -131,7 +161,7 @@
           </template>
         </Column>
 
-        <Column field="floor" header="Этаж" sortable data-type="numeric" style="min-width: 80px">
+        <Column field="floor" header="Этаж" sortable data-type="numeric" style="min-width: 70px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -142,12 +172,36 @@
           </template>
         </Column>
 
+        <!-- НОВЫЙ ФИЛЬТР: Год постройки -->
+        <Column field="buildYear" header="Год" sortable data-type="numeric" style="min-width: 75px">
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText
+              v-model="filterModel.value"
+              type="number"
+              placeholder="Год"
+              @input="filterCallback()"
+            />
+          </template>
+        </Column>
+
+        <!-- НОВЫЙ ФИЛЬТР: Материал стен -->
+        <Column field="material" header="Материал" sortable style="min-width: 100px">
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText
+              v-model="filterModel.value"
+              type="text"
+              placeholder="Материал"
+              @input="filterCallback()"
+            />
+          </template>
+        </Column>
+
         <Column
           field="priceLabel"
           header="Цена"
           sortable
           sort-field="price"
-          style="min-width: 120px"
+          style="min-width: 100px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="Цена" @input="filterCallback()" />
@@ -159,14 +213,14 @@
           header="Цена / м²"
           sortable
           sort-field="sqm"
-          style="min-width: 120px"
+          style="min-width: 100px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="₽/м²" @input="filterCallback()" />
           </template>
         </Column>
 
-        <Column field="sourceLabel" header="Источник" sortable style="min-width: 100px">
+        <Column field="sourceLabel" header="Источник" sortable style="min-width: 95px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -176,7 +230,7 @@
           </template>
         </Column>
 
-        <Column field="statusLabel" header="Статус" sortable style="min-width: 130px">
+        <Column field="statusLabel" header="Статус" sortable style="min-width: 100px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="Статус" @input="filterCallback()" />
           </template>
@@ -187,7 +241,7 @@
           header="Опубликовано"
           sortable
           sort-field="publishedAt"
-          style="min-width: 120px"
+          style="min-width: 110px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="Дата" @input="filterCallback()" />
@@ -199,7 +253,7 @@
           header="Изм. цены"
           sortable
           sort-field="priceChangePercent"
-          style="min-width: 100px"
+          style="min-width: 90px"
         >
           <template #body="{ data }">
             <span
@@ -260,14 +314,20 @@ const panelHeight = ref(DEFAULT_HEIGHT);
 const isFullscreen = ref(false);
 const isResizing = ref(false);
 const skeletonRows = Array.from({ length: 8 }, (_, index) => index);
-const skeletonCells = Array.from({ length: 10 }, (_, index) => index);
+// Увеличили количество ячеек для скелетона, так как колонок стало больше
+const skeletonCells = Array.from({ length: 14 }, (_, index) => index);
 const globalFilter = ref('');
 
+// Добавлены новые поля для глобальной фильтрации
 const globalFilterFields = [
   'address',
+  'district',
+  'polygon',
   'rooms',
   'area',
   'floor',
+  'buildYear',
+  'material',
   'priceLabel',
   'sqmLabel',
   'sourceLabel',
@@ -276,12 +336,17 @@ const globalFilterFields = [
   'priceChangeLabel',
 ];
 
+// Добавлены новые правила фильтрации
 const tableFilters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS },
   address: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  district: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  polygon: { value: null, matchMode: FilterMatchMode.CONTAINS },
   rooms: { value: null, matchMode: FilterMatchMode.EQUALS },
   area: { value: null, matchMode: FilterMatchMode.EQUALS },
   floor: { value: null, matchMode: FilterMatchMode.EQUALS },
+  buildYear: { value: null, matchMode: FilterMatchMode.EQUALS },
+  material: { value: null, matchMode: FilterMatchMode.CONTAINS },
   priceLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
   sqmLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
   sourceLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
@@ -394,7 +459,8 @@ onBeforeUnmount(() => {
 
 .flats-table-panel__skeleton-row {
   display: grid;
-  grid-template-columns: 2fr repeat(9, minmax(0, 1fr));
+  /* Адаптировали сетку скелетона под увеличенное количество колонок */
+  grid-template-columns: 2fr repeat(13, minmax(0, 1fr));
   gap: 12px;
   align-items: center;
 }
@@ -492,6 +558,22 @@ onBeforeUnmount(() => {
 
 .flats-table-panel__datatable :deep(.flats-table-panel__row--selected) {
   background: rgba(255, 0, 30, 0.08) !important;
+}
+
+/* Делаем дефолтные плейсхолдеры в инпутах фильтрации более прозрачными */
+.flats-table-panel__datatable :deep(.p-column-filter-row .p-inputtext::placeholder) {
+  opacity: 0.4;
+}
+
+/* Стилизация ползунков-разделителей колонок PrimeVue (чтобы было видно область перетаскивания) */
+.flats-table-panel__datatable :deep(.p-datatable-column-resizer) {
+  width: 8px;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.flats-table-panel__datatable :deep(.p-datatable-column-resizer:hover) {
+  background: rgba(15, 23, 42, 0.1);
 }
 
 .flats-table-panel__empty {

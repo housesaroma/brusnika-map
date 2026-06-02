@@ -19,7 +19,7 @@
               :stroke-dashoffset="getDashOffset(index)"
             />
           </svg>
-          <div class="step-loader__inner">
+          <div class="step-loader__inner" :class="{ 'is-done-icon': index < stepIndex }">
             <span v-if="index < stepIndex">✓</span>
             <span v-else-if="index === stepIndex">{{ Math.round(stepProgress) }}%</span>
             <span v-else>—</span>
@@ -97,26 +97,35 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.step-loader {
+  width: fit-content;
+  margin: 0 auto; /* Выравнивает весь блок по центру родителя */
+}
+
 .step-loader h4 {
   margin: 0 0 16px;
+  text-align: center; /* Заголовок тоже будет по центру */
 }
 
 .step-loader__list {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: fit-content;
 }
 
 .step-loader__item {
   display: flex;
   align-items: center;
   gap: 12px;
+  white-space: nowrap; 
 }
 
 .step-loader__circle {
   position: relative;
   width: 48px;
   height: 48px;
+  flex-shrink: 0; /* Чтобы круги не сжимались */
 }
 
 .step-loader__circle svg {
@@ -132,6 +141,12 @@ onUnmounted(() => {
   place-items: center;
   font-size: 0.65rem;
   font-weight: 600;
+  color: var(--app-foreground);
+}
+
+/* Цвет галочки для завершенных шагов (опционально, для красоты) */
+.step-loader__inner.is-done-icon {
+  color: #10b981; /* Зеленый цвет успеха */
 }
 
 .step-loader__label {

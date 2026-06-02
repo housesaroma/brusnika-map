@@ -16,13 +16,13 @@
         <p>Прогнозная стоимость</p>
         <strong>{{ formatCompactPrice(result.predictedPrice) }}</strong>
         <small>{{ formatPricePerSqm(result.pricePerSqm) }}</small>
-        <span v-if="result.avgAnalogPrice"
-          >Средняя цена аналогов: {{ formatCompactPrice(result.avgAnalogPrice) }}</span
-        >
+        <span v-if="result.avgAnalogPrice">
+          Средняя цена аналогов: {{ formatCompactPrice(result.avgAnalogPrice) }}
+        </span>
       </div>
       <AnalogSlider :analogs="result.analogs" />
       <Button
-        class="valuation-modal__action"
+        class="valuation-modal__action valuation-modal__action--secondary"
         label="Изменить параметры"
         outlined
         @click="result = null"
@@ -219,10 +219,28 @@ function handleLoadingDone() {
   gap: 12px;
 }
 
+/* Общий стиль для основных кнопок действий */
 .valuation-modal__action {
   margin-top: 6px;
   background: var(--app-primary);
-  border: none;
+  border: 1px solid var(--app-primary);
+  color: #fff; /* Цвет текста для дефолтной кнопки */
+}
+
+/* Стилизация для контурной (outlined) кнопки "Изменить параметры" */
+.valuation-modal__action--secondary {
+  background: transparent !important;
+  border: 1px solid var(--app-primary) !important;
+  color: var(--app-primary) !important;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+/* Эффект наведения для контурной кнопки */
+.valuation-modal__action--secondary:hover {
+  background: var(--app-primary) !important;
+  color: #fff !important;
 }
 
 .valuation-modal__result {
