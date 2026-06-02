@@ -37,14 +37,16 @@
             <i :class="predictionTrend.icon"></i>
             <small>{{ predictionTrend.label }}</small>
           </div>
-          <small v-else-if="loadingPrediction">Загрузка...</small>
+          <Skeleton v-else-if="loadingPrediction" width="120px" height="12px" />
           <small v-else>Нет данных</small>
         </div>
       </div>
 
-      <div v-if="loadingDetails" class="detail-modal__loading">
-        <ProgressSpinner style="width: 36px; height: 36px" />
-        <p>Загружаем данные объекта...</p>
+      <div v-if="loadingDetails" class="detail-modal__grid detail-modal__grid--skeleton">
+        <div v-for="index in 9" :key="index" class="detail-modal__cell">
+          <Skeleton width="90px" height="12px" />
+          <Skeleton width="140px" height="18px" />
+        </div>
       </div>
 
       <div v-else class="detail-modal__grid">
@@ -105,7 +107,7 @@
 import { computed } from 'vue';
 import Dialog from 'primevue/dialog';
 import Tag from 'primevue/tag';
-import ProgressSpinner from 'primevue/progressspinner';
+import Skeleton from 'primevue/skeleton';
 import AnalogSlider from './AnalogSlider.vue';
 import { formatCompactPrice, formatPricePerSqm } from '@/utils/formatters';
 import { getFlatStatusLabel, getSourceLabel, formatFlatDate } from '@/utils/flatLabels';
@@ -320,6 +322,10 @@ const statusText = computed(() => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+}
+
+.detail-modal__grid--skeleton .detail-modal__cell {
+  gap: 8px;
 }
 
 .detail-modal__cell {

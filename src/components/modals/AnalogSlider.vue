@@ -8,11 +8,21 @@
       </div>
     </div>
 
-    <div v-if="loading" class="analog-slider__loading">
-      <ProgressSpinner style="width: 28px; height: 28px" />
-      <div class="analog-slider__loading-text">
-        <span>Подбираем аналоги. Это может занять до 60 секунд.</span>
-        <small>Мы продолжаем загрузку, пожалуйста, подождите.</small>
+    <div v-if="loading" class="analog-slider__skeleton">
+      <div v-for="index in 3" :key="index" class="analog-card analog-card--skeleton">
+        <div class="analog-card__header">
+          <Skeleton width="120px" height="14px" />
+          <Skeleton width="32px" height="18px" borderRadius="999px" />
+        </div>
+        <div class="analog-card__address">
+          <Skeleton width="160px" height="12px" />
+        </div>
+        <div class="analog-card__meta">
+          <Skeleton width="140px" height="12px" />
+        </div>
+        <div class="analog-card__price">
+          <Skeleton width="100px" height="16px" />
+        </div>
       </div>
     </div>
 
@@ -50,7 +60,7 @@
 import { ref } from 'vue';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
-import ProgressSpinner from 'primevue/progressspinner';
+import Skeleton from 'primevue/skeleton';
 import { formatCompactPrice } from '@/utils/formatters';
 
 defineProps({
@@ -103,24 +113,17 @@ function scroll(direction) {
   margin-top: 10px;
 }
 
-.analog-slider__loading {
+.analog-slider__skeleton {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
   margin-top: 10px;
-  font-size: 0.75rem;
-  color: var(--app-muted-foreground);
 }
 
-.analog-slider__loading-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.analog-slider__loading-text small {
-  font-size: 0.7rem;
-  color: var(--app-muted-foreground);
+.analog-card--skeleton {
+  cursor: default;
+  background: rgba(242, 236, 230, 0.35);
 }
 
 .analog-slider__empty {
