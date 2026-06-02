@@ -57,6 +57,7 @@
         v-model:filters="tableFilters"
         :value="rows"
         :global-filter-fields="globalFilterFields"
+        :loading="loading"
         data-key="id"
         paginator
         :rows="25"
@@ -72,6 +73,21 @@
         :row-class="rowClass"
         @row-click="handleRowClick"
       >
+        <template #loading>
+          <div class="flats-table-panel__skeleton">
+            <div
+              v-for="rowIndex in skeletonRows"
+              :key="rowIndex"
+              class="flats-table-panel__skeleton-row"
+            >
+              <Skeleton
+                v-for="cellIndex in skeletonCells"
+                :key="cellIndex"
+                height="14px"
+              />
+            </div>
+          </div>
+        </template>
         <template #empty>
           <div class="flats-table-panel__empty">Нет объектов для отображения</div>
         </template>
@@ -208,6 +224,7 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
+import Skeleton from 'primevue/skeleton';
 import { FilterMatchMode } from '@primevue/core/api';
 
 const props = defineProps({
@@ -227,6 +244,10 @@ const props = defineProps({
     type: String,
     default: 'Таблица объектов',
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['close', 'flat-click']);
@@ -238,6 +259,8 @@ const MAX_HEIGHT_PERCENT = 95;
 const panelHeight = ref(DEFAULT_HEIGHT);
 const isFullscreen = ref(false);
 const isResizing = ref(false);
+const skeletonRows = Array.from({ length: 8 }, (_, index) => index);
+const skeletonCells = Array.from({ length: 10 }, (_, index) => index);
 const globalFilter = ref('');
 
 const globalFilterFields = [
@@ -360,6 +383,20 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.98);
   border-top: 1px solid var(--app-border);
   box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.flats-table-panel__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.flats-table-panel__skeleton-row {
+  display: grid;
+  grid-template-columns: 2fr repeat(9, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
 }
 
 .flats-table-panel--fullscreen {

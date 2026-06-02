@@ -21,7 +21,18 @@
       </div>
 
       <div class="properties-panel__status">
-        <ProgressSpinner v-if="loading" style="width: 40px; height: 40px" />
+        <div v-if="loading" class="properties-panel__skeleton">
+          <div class="properties-panel__skeleton-stats">
+            <Skeleton width="120px" height="20px" />
+            <Skeleton width="90px" height="20px" />
+          </div>
+          <div class="properties-panel__skeleton-list">
+            <div v-for="index in 6" :key="index" class="properties-panel__skeleton-item">
+              <Skeleton width="70%" height="14px" />
+              <Skeleton width="40px" height="18px" />
+            </div>
+          </div>
+        </div>
         <Message v-else-if="error" severity="error" :closable="false">
           {{ error }}
         </Message>
@@ -32,7 +43,7 @@
       </div>
 
       <Listbox
-        v-if="items?.length"
+        v-if="!loading && items?.length"
         :model-value="selectedItem"
         :options="items"
         option-label="name"
@@ -60,7 +71,7 @@ import { ref } from 'vue';
 import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Listbox from 'primevue/listbox';
-import ProgressSpinner from 'primevue/progressspinner';
+import Skeleton from 'primevue/skeleton';
 import Message from 'primevue/message';
 
 defineProps({
@@ -142,6 +153,34 @@ function handleItemClick(item) {
 
 .properties-panel__status {
   margin-bottom: 1rem;
+}
+
+.properties-panel__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.properties-panel__skeleton-stats {
+  display: flex;
+  gap: 8px;
+}
+
+.properties-panel__skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.properties-panel__skeleton-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--p-border-radius);
+  border: 1px solid var(--p-surface-100);
+  background: var(--p-surface-50);
 }
 
 .properties-panel__content {

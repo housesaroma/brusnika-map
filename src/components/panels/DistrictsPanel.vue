@@ -6,8 +6,10 @@
     </div>
 
     <div v-if="loading" class="districts-panel__loading">
-      <ProgressSpinner style="width: 32px; height: 32px" />
-      <p class="text-gray-500 text-sm mt-2">Загрузка районов...</p>
+      <div v-for="index in 6" :key="index" class="districts-panel__skeleton-item">
+        <Skeleton width="70%" height="14px" />
+        <Skeleton width="18px" height="18px" borderRadius="6px" />
+      </div>
     </div>
 
     <div v-else-if="error" class="districts-panel__error">
@@ -36,7 +38,7 @@
 <script setup>
 import { onMounted } from 'vue';
 import Tag from 'primevue/tag';
-import ProgressSpinner from 'primevue/progressspinner';
+import Skeleton from 'primevue/skeleton';
 import { useDistrictsStore } from '@/stores/districts';
 
 const districtsStore = useDistrictsStore();
@@ -90,6 +92,19 @@ function handleDistrictClick(district) {
   padding: 2rem 1rem;
   text-align: center;
   flex: 1;
+}
+
+.districts-panel__skeleton-item {
+  width: 100%;
+  max-width: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--p-border-radius);
+  background: var(--p-surface-50);
+  border: 1px solid var(--p-surface-100);
 }
 
 .districts-panel__list {
