@@ -120,9 +120,25 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  selectedCity: {
+    type: Object,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['close', 'applyFilters']);
+
+const params = ref({
+  area: 44,
+  rooms: 1,
+  floor: 5,
+  kitchenArea: 8,
+  balcony: false,
+  metroDistance: 10,
+  material: 'panel',
+  yearBuilt: 2000,
+  renovation: 'euro',
+});
 
 const visible = computed({
   get: () => props.open,
@@ -147,29 +163,22 @@ const renovationOptions = [
   { label: 'Под ключ', value: 'full' },
 ];
 
-const params = ref({
-  rooms: 2,
-  area: 55,
-  kitchenArea: 10,
-  floor: 5,
-  metroDistance: 10,
-  material: 'monolith',
-  renovation: 'clean',
-  balcony: true,
-  yearBuilt: 2018,
-});
-
 const result = ref(null);
 const loading = ref(false);
 const evaluationSteps = ref([]);
 
-// Получаем CityId из URL или используем дефолтное значение
+// Получаем CityId из выбранного города
 function getCityId() {
+  if (props.selectedCity?.id) {
+    return props.selectedCity.id;
+  }
+  
+  // Fallback: пробуем получить из URL
   const urlParams = new URLSearchParams(window.location.search);
   const cityId = urlParams.get('cityId');
   if (cityId) return cityId;
   
-  // Дефолтный CityId для тестирования (замените на реальный при необходимости)
+  // Последний fallback - дефолтный CityId
   return 'a0ee0000-0000-0000-0000-000000000001';
 }
 

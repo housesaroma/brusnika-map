@@ -112,6 +112,7 @@
 
     <ValuationModal 
       :open="showValuation" 
+      :selected-city="selectedCity"
       @close="showValuation = false"
       @apply-filters="handleApplyValuationFilters"
     />
