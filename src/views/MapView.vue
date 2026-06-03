@@ -8,7 +8,7 @@
       :selected-city="selectedCity"
       :city-options="cityOptions"
       @valuation="showValuation = true"
-      @filters="showFilters = true"
+      @edit-filters="showFilters = true"
       @heatmap="handleHeatmapToggle"
       @city-change="handleCityChange"
     />
@@ -82,6 +82,7 @@
         @toggle-polygon="togglePolygonSelection"
         @edit-polygon="startEditingPolygon"
         @remove-polygon="removePolygon"
+        @edit-filters="showFilters = true"
       />
 
       <FlatsResultsTable
@@ -109,7 +110,12 @@
       @select-analog="handleAnalogSelect"
     />
 
-    <ValuationModal :open="showValuation" @close="showValuation = false" />
+    <ValuationModal 
+      :open="showValuation" 
+      :selected-city="selectedCity"
+      @close="showValuation = false"
+      @apply-filters="handleApplyValuationFilters"
+    />
 
     <FiltersModal
       v-model:open="showFilters"
@@ -762,6 +768,16 @@ async function fetchPrediction(flatId) {
 function handleApplyFilters(nextFilters) {
   showFilters.value = false;
   filters.value = { ...DEFAULT_FILTERS, ...nextFilters };
+  saveFilters(filters.value);
+  showFilterResultsSidebar.value = hasActiveFiltersUtil(filters.value);
+  showResultsTable.value = false;
+  selectedBuilding.value = null;
+  loadFlats();
+}
+
+function handleApplyValuationFilters(valuationFilters) {
+  showValuation.value = false;
+  filters.value = { ...DEFAULT_FILTERS, ...valuationFilters };
   saveFilters(filters.value);
   showFilterResultsSidebar.value = hasActiveFiltersUtil(filters.value);
   showResultsTable.value = false;
