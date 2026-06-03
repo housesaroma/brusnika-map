@@ -4,7 +4,7 @@ import { formatPricePerSqm } from '@/utils/formatters';
 export function normalizeAnalogItem(item) {
   if (!item) return null;
 
-  const id = item.flatId || item.FlatId || item.id;
+  const id = item.flatId || item.FlatId || item.flat_id || item.id;
   if (!id) return null;
 
   const price = Number(item.price ?? item.Price ?? 0);
@@ -17,12 +17,14 @@ export function normalizeAnalogItem(item) {
   return {
     id,
     flatId: id,
-    rooms: Number(item.rooms ?? item.Rooms ?? 0),
+    rooms: Number(item.rooms ?? item.Rooms ?? item.rooms_count ?? item.RoomsCount ?? 0),
     area,
-    floor: Number(item.floor ?? item.Floor ?? 0),
+    floor: Number(item.floor ?? item.Floor ?? item.floor_num ?? item.FloorNum ?? 0),
     price,
     sqm,
-    similarity: Number(item.similarityScore ?? item.SimilarityScore ?? item.similarity ?? 0),
+    similarity: Number(
+      item.similarityScore ?? item.SimilarityScore ?? item.similarity ?? item.similarity_score ?? 0
+    ),
     address: item.address ?? item.Address ?? 'Без адреса',
     pricePerSqm: formatPricePerSqm(sqm),
     center: parseCoordsToLngLat(coordsRaw),

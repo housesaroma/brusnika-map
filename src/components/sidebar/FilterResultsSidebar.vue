@@ -81,14 +81,23 @@
     </div>
 
     <div class="sidebar__list">
-      <PropertyCard
-        v-for="flat in flats"
-        :key="flat.id"
-        :flat="flat"
-        :is-selected="flat.id === selectedFlatId"
-        @click="emit('flat-click', flat)"
-      />
-      <p v-if="!flats.length" class="sidebar__empty">{{ emptyText }}</p>
+      <template v-if="loading">
+        <div v-for="index in 6" :key="index" class="sidebar__skeleton-card">
+          <Skeleton width="70%" height="14px" />
+          <Skeleton width="55%" height="12px" />
+          <Skeleton width="40%" height="12px" />
+        </div>
+      </template>
+      <template v-else>
+        <PropertyCard
+          v-for="flat in flats"
+          :key="flat.id"
+          :flat="flat"
+          :is-selected="flat.id === selectedFlatId"
+          @click="emit('flat-click', flat)"
+        />
+        <p v-if="!flats.length" class="sidebar__empty">{{ emptyText }}</p>
+      </template>
     </div>
   </aside>
 </template>
@@ -97,6 +106,7 @@
 import { computed, ref } from 'vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
+import Skeleton from 'primevue/skeleton';
 import PropertyCard from './PropertyCard.vue';
 
 const props = defineProps({
@@ -109,6 +119,10 @@ const props = defineProps({
     default: null,
   },
   isOpen: {
+    type: Boolean,
+    default: false,
+  },
+  loading: {
     type: Boolean,
     default: false,
   },
@@ -308,6 +322,16 @@ function handleSave() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.sidebar__skeleton-card {
+  border-radius: 14px;
+  border: 1px solid var(--app-border);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(242, 236, 230, 0.35);
 }
 
 .sidebar__empty {

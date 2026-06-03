@@ -8,9 +8,22 @@
       </div>
     </div>
 
-    <div v-if="loading" class="analog-slider__loading">
-      <ProgressSpinner style="width: 28px; height: 28px" />
-      <span>Загружаем аналоги...</span>
+    <div v-if="loading" class="analog-slider__skeleton">
+      <div v-for="index in 3" :key="index" class="analog-card analog-card--skeleton">
+        <div class="analog-card__header">
+          <Skeleton width="120px" height="14px" />
+          <Skeleton width="32px" height="18px" borderRadius="999px" />
+        </div>
+        <div class="analog-card__address">
+          <Skeleton width="160px" height="12px" />
+        </div>
+        <div class="analog-card__meta">
+          <Skeleton width="140px" height="12px" />
+        </div>
+        <div class="analog-card__price">
+          <Skeleton width="100px" height="16px" />
+        </div>
+      </div>
     </div>
 
     <p v-else-if="!analogs.length" class="analog-slider__empty">Аналоги не найдены</p>
@@ -38,7 +51,6 @@
           <span v-if="analog.pricePerSqm">• {{ analog.pricePerSqm }}</span>
         </p>
         <p class="analog-card__price">{{ formatCompactPrice(analog.price) }}</p>
-        <span class="analog-card__hint">Открыть карточку</span>
       </button>
     </div>
   </section>
@@ -48,7 +60,7 @@
 import { ref } from 'vue';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
-import ProgressSpinner from 'primevue/progressspinner';
+import Skeleton from 'primevue/skeleton';
 import { formatCompactPrice } from '@/utils/formatters';
 
 defineProps({
@@ -101,13 +113,17 @@ function scroll(direction) {
   margin-top: 10px;
 }
 
-.analog-slider__loading {
+.analog-slider__skeleton {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
   margin-top: 10px;
-  font-size: 0.75rem;
-  color: var(--app-muted-foreground);
+}
+
+.analog-card--skeleton {
+  cursor: default;
+  background: rgba(242, 236, 230, 0.35);
 }
 
 .analog-slider__empty {

@@ -37,14 +37,16 @@
             <i :class="predictionTrend.icon"></i>
             <small>{{ predictionTrend.label }}</small>
           </div>
-          <small v-else-if="loadingPrediction">Загрузка...</small>
+          <Skeleton v-else-if="loadingPrediction" width="120px" height="12px" />
           <small v-else>Нет данных</small>
         </div>
       </div>
 
-      <div v-if="loadingDetails" class="detail-modal__loading">
-        <ProgressSpinner style="width: 36px; height: 36px" />
-        <p>Загружаем данные объекта...</p>
+      <div v-if="loadingDetails" class="detail-modal__grid detail-modal__grid--skeleton">
+        <div v-for="index in 9" :key="index" class="detail-modal__cell">
+          <Skeleton width="90px" height="12px" />
+          <Skeleton width="140px" height="18px" />
+        </div>
       </div>
 
       <div v-else class="detail-modal__grid">
@@ -87,9 +89,14 @@
       </div>
 
       <div v-if="prediction?.recommendation" class="detail-modal__recommendation">
-        <span>Рекомендация</span>
-        <p>{{ prediction.recommendation }}</p>
-        <small v-if="prediction.status">{{ prediction.status }}</small>
+        <div class="detail-modal__recommendation-icon">
+          <i class="pi pi-info-circle"></i>
+        </div>
+        <div class="detail-modal__recommendation-body">
+          <span>Рекомендация системы</span>
+          <p>{{ prediction.recommendation }}</p>
+          <small v-if="prediction.status">{{ prediction.status }}</small>
+        </div>
       </div>
 
       <AnalogSlider
@@ -105,7 +112,7 @@
 import { computed } from 'vue';
 import Dialog from 'primevue/dialog';
 import Tag from 'primevue/tag';
-import ProgressSpinner from 'primevue/progressspinner';
+import Skeleton from 'primevue/skeleton';
 import AnalogSlider from './AnalogSlider.vue';
 import { formatCompactPrice, formatPricePerSqm } from '@/utils/formatters';
 import { getFlatStatusLabel, getSourceLabel, formatFlatDate } from '@/utils/flatLabels';
@@ -322,6 +329,10 @@ const statusText = computed(() => {
   gap: 12px;
 }
 
+.detail-modal__grid--skeleton .detail-modal__cell {
+  gap: 8px;
+}
+
 .detail-modal__cell {
   padding: 10px 12px;
   border-radius: 12px;
@@ -341,30 +352,51 @@ const statusText = computed(() => {
   color: var(--app-muted-foreground);
 }
 
+/* Полностью обновленный блок рекомендаций */
 .detail-modal__recommendation {
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--app-border);
-  background: rgba(248, 243, 236, 0.5);
+  padding: 14px 16px;
+  border-radius: 14px;
+  /* Мягкий синий инфо-оттенок для фона и границ */
+  border: 1px solid rgba(14, 116, 144, 0.15);
+  background: rgba(14, 116, 144, 0.05);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.detail-modal__recommendation-icon {
+  color: #0e7490; /* Цвет иконки (cyan/blue) */
+  font-size: 1.1rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.detail-modal__recommendation-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
-.detail-modal__recommendation span {
-  font-size: 0.7rem;
-  color: var(--app-muted-foreground);
+.detail-modal__recommendation-body span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0e7490; /* Подчеркиваем заголовок синим */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.detail-modal__recommendation p {
+.detail-modal__recommendation-body p {
   margin: 0;
   font-size: 0.85rem;
-  line-height: 1.45;
+  line-height: 1.5;
+  color: var(--app-foreground);
 }
 
-.detail-modal__recommendation small {
+.detail-modal__recommendation-body small {
   color: var(--app-muted-foreground);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  margin-top: 2px;
 }
 
 .detail-modal__loading {
