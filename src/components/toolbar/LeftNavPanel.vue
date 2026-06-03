@@ -29,21 +29,20 @@
         <i class="pi pi-calculator"></i>
         <div>
           <span>Оценка стоимости</span>
-          <small>Прогноз цены по параметрам</small>
+          <small>Прогноз цены и поиск квартир</small>
         </div>
       </button>
 
       <button
+        v-if="hasActiveFilters"
         class="left-nav__item"
-        :class="{ 'left-nav__item--active': hasActiveFilters }"
-        @click="emit('filters')"
+        @click="emit('edit-filters')"
       >
-        <i class="pi pi-filter"></i>
+        <i class="pi pi-cog"></i>
         <div>
-          <span>Фильтры</span>
-          <small>Поиск квартир на карте</small>
+          <span>Редактировать фильтры</span>
+          <small>Настроить параметры поиска</small>
         </div>
-        <span v-if="hasActiveFilters" class="left-nav__badge">Активны</span>
       </button>
 
       <div class="left-nav__heatmap">
@@ -107,7 +106,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['valuation', 'filters', 'heatmap', 'city-change']);
+const emit = defineEmits(['valuation', 'edit-filters', 'heatmap', 'city-change']);
 
 const showHeatmapMenu = ref(false);
 

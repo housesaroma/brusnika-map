@@ -12,7 +12,7 @@
       <div v-for="index in 3" :key="index" class="analog-card analog-card--skeleton">
         <div class="analog-card__header">
           <Skeleton width="120px" height="14px" />
-          <Skeleton width="32px" height="18px" borderRadius="999px" />
+          <Skeleton width="32px" height="18px" border-radius="999px" />
         </div>
         <div class="analog-card__address">
           <Skeleton width="160px" height="12px" />

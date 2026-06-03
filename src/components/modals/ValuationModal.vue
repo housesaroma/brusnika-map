@@ -8,7 +8,10 @@
     </template>
 
     <div v-if="loading" class="valuation-modal__loader">
-      <StepLoader @done="handleLoadingDone" />
+      <StepLoader 
+        :steps="evaluationSteps" 
+        @done="handleLoadingDone"
+      />
     </div>
 
     <div v-else-if="result" class="valuation-modal__result">
@@ -21,12 +24,19 @@
         </span>
       </div>
       <AnalogSlider :analogs="result.analogs" />
-      <Button
-        class="valuation-modal__action valuation-modal__action--secondary"
-        label="Изменить параметры"
-        outlined
-        @click="result = null"
-      />
+      <div class="valuation-modal__actions">
+        <Button
+          class="valuation-modal__action valuation-modal__action--secondary"
+          label="Изменить параметры"
+          outlined
+          @click="result = null"
+        />
+        <Button
+          class="valuation-modal__action valuation-modal__action--primary"
+          label="Показать на карте"
+          @click="handleApplyToFilters"
+        />
+      </div>
     </div>
 
     <div v-else class="valuation-modal__form">
@@ -103,6 +113,7 @@ import InputSwitch from 'primevue/inputswitch';
 import AnalogSlider from './AnalogSlider.vue';
 import StepLoader from './StepLoader.vue';
 import { formatCompactPrice, formatPricePerSqm } from '@/utils/formatters';
+import predictionsApi from '@/api/predictions';
 
 const props = defineProps({
   open: {
@@ -111,7 +122,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'applyFilters']);
 
 const visible = computed({
   get: () => props.open,
@@ -150,29 +161,122 @@ const params = ref({
 
 const result = ref(null);
 const loading = ref(false);
+const evaluationSteps = ref([]);
+
+// Получаем CityId из URL или используем дефолтное значение
+function getCityId() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const cityId = urlParams.get('cityId');
+  if (cityId) return cityId;
+  
+  // Дефолтный CityId для тестирования (замените на реальный при необходимости)
+  return 'a0ee0000-0000-0000-0000-000000000001';
+}
 
 function handleEvaluate() {
   loading.value = true;
   result.value = null;
+  
+  // Формируем payload для API согласно DTO PredictByParametersRequest
+  const payload = {
+    FlatArea: params.value.area,
+    FlatRooms: params.value.rooms,
+    FlatFloor: params.value.floor,
+    FlatAreaKitchen: params.value.kitchenArea,
+    FlatAreaLiving: null, // Не используется в текущей форме
+    FlatBalcony: params.value.balcony ? 1 : 0,
+    FlatLoggia: 0, // Не используется в текущей форме
+    FlatFurniture: 0, // Не используется в текущей форме
+    FlatStatus: 'active',
+    CityId: getCityId(),
+    TotalFloors: null, // Не используется в текущей форме
+    BuildYear: params.value.yearBuilt,
+    Renovation: mapRenovationToBackend(params.value.renovation),
+    Source: 'manual',
+  };
+
+  Promise.resolve()
+    .then(() => {
+      evaluationSteps.value = [
+        { label: 'Анализируем параметры квартиры', duration: 500 },
+        { label: 'Ищем похожие объявления', duration: 1000 },
+        { label: 'Считаем и уточняем оценку', duration: 800 },
+      ];
+      return new Promise((resolve) => setTimeout(resolve, 500));
+    })
+    .then(() => {
+      return predictionsApi.estimateByParams(payload);
+    })
+    .then((response) => {
+      const data = response.data;
+      
+      // Нормализуем данные с бэкенда согласно PredictByParametersResult
+      const predictedPrice = data.PredictedPrice || data.predictedPrice || 0;
+      const pricePerSqm = predictedPrice > 0 ? predictedPrice / params.value.area : 0;
+
+      result.value = {
+        predictedPrice,
+        pricePerSqm,
+        avgAnalogPrice: 0,
+        analogs: [],
+      };
+    })
+    .catch((error) => {
+      console.error('Ошибка оценки:', error);
+      // Fallback на mock данные если API не доступен
+      const basePrice = 130000;
+      const renovationFactor =
+        params.value.renovation === 'full' ? 1.2 : params.value.renovation === 'clean' ? 1.1 : 1.0;
+      const materialFactor =
+        params.value.material === 'monolith' ? 1.1 : params.value.material === 'brick' ? 1.05 : 1.0;
+      const metroFactor = 1 - Math.max(0, params.value.metroDistance - 5) * 0.01;
+      const pricePerSqm = Math.max(65000, basePrice * renovationFactor * materialFactor * metroFactor);
+      const predictedPrice = Math.round(pricePerSqm * params.value.area);
+
+      result.value = {
+        predictedPrice,
+        pricePerSqm,
+        avgAnalogPrice: Math.round(predictedPrice * 0.96),
+        analogs: [],
+      };
+    })
+    .finally(() => {
+      setTimeout(() => {
+        loading.value = false;
+      }, 500);
+    });
+}
+
+function mapRenovationToBackend(renovation) {
+  // Маппинг значений ремонта из frontend в формат backend
+  const mapping = {
+    rough: 'without',
+    pre: 'pre',
+    clean: 'euro',
+    full: 'design',
+  };
+  return mapping[renovation] || 'without';
 }
 
 function handleLoadingDone() {
-  const basePrice = 130000;
-  const renovationFactor =
-    params.value.renovation === 'full' ? 1.2 : params.value.renovation === 'clean' ? 1.1 : 1.0;
-  const materialFactor =
-    params.value.material === 'monolith' ? 1.1 : params.value.material === 'brick' ? 1.05 : 1.0;
-  const metroFactor = 1 - Math.max(0, params.value.metroDistance - 5) * 0.01;
-  const pricePerSqm = Math.max(65000, basePrice * renovationFactor * materialFactor * metroFactor);
-  const predictedPrice = Math.round(pricePerSqm * params.value.area);
+  // Этот метод больше не используется, логика перенесена в handleEvaluate
+}
 
-  result.value = {
-    predictedPrice,
-    pricePerSqm,
-    avgAnalogPrice: Math.round(predictedPrice * 0.96),
-    analogs: [],
+function handleApplyToFilters() {
+  if (!result.value) return;
+
+  const filters = {
+    roomsMin: params.value.rooms,
+    roomsMax: params.value.rooms,
+    areaMin: Math.round(params.value.area * 0.85),
+    areaMax: Math.round(params.value.area * 1.15),
+    floorMin: Math.max(1, params.value.floor - 2),
+    floorMax: params.value.floor + 3,
+    priceMin: Math.round(result.value.predictedPrice * 0.85),
+    priceMax: Math.round(result.value.predictedPrice * 1.15),
   };
-  loading.value = false;
+
+  emit('applyFilters', filters);
 }
 </script>
 
@@ -262,5 +366,24 @@ function handleLoadingDone() {
 
 .valuation-modal__result-card strong {
   font-size: 1.5rem;
+}
+
+.valuation-modal__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+/* Стиль для основной кнопки "Показать на карте" */
+.valuation-modal__action--primary {
+  background: var(--app-primary) !important;
+  border: 1px solid var(--app-primary) !important;
+  color: #fff !important;
+}
+
+.valuation-modal__action--primary:hover {
+  background: var(--app-primary-dark, #d9003c) !important;
+  border-color: var(--app-primary-dark, #d9003c) !important;
 }
 </style>

@@ -22,6 +22,14 @@
         class="sidebar__table-button"
         @click="emit('show-table')"
       />
+      <Button
+        v-if="mode === 'filters'"
+        label="Изменить фильтры"
+        icon="pi pi-cog"
+        size="small"
+        class="sidebar__filters-button"
+        @click="emit('edit-filters')"
+      />
     </div>
 
     <div v-if="mode === 'polygon' && polygons.length" class="sidebar__polygons">
@@ -149,6 +157,7 @@ const emit = defineEmits([
   'toggle-polygon',
   'edit-polygon',
   'remove-polygon',
+  'edit-filters',
 ]);
 
 const selectedCount = computed(() => props.polygons.filter((polygon) => polygon.selected).length);
@@ -239,6 +248,11 @@ function handleSave() {
 
 .sidebar__table-button {
   width: 100%;
+}
+
+.sidebar__filters-button {
+  width: 100%;
+  margin-top: 8px;
 }
 
 .sidebar__polygons {

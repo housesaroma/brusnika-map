@@ -8,7 +8,7 @@
     <div v-if="loading" class="districts-panel__loading">
       <div v-for="index in 6" :key="index" class="districts-panel__skeleton-item">
         <Skeleton width="70%" height="14px" />
-        <Skeleton width="18px" height="18px" borderRadius="6px" />
+        <Skeleton width="18px" height="18px" border-radius="6px" />
       </div>
     </div>
 

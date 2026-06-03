@@ -2,12 +2,12 @@
   <div class="step-loader">
     <h4>Рассчитываем оценку</h4>
     <div class="step-loader__list">
-      <div v-for="(step, index) in steps" :key="step.label" class="step-loader__item">
+      <div v-for="(step, index) in steps" :key="index" class="step-loader__item">
         <div class="step-loader__circle">
           <svg viewBox="0 0 48 48">
             <circle cx="24" cy="24" r="20" fill="none" stroke="#e5e7eb" stroke-width="3" />
             <circle
-              v-if="index <= stepIndex"
+              v-if="index <= activeStepIndex"
               cx="24"
               cy="24"
               r="20"
@@ -19,15 +19,15 @@
               :stroke-dashoffset="getDashOffset(index)"
             />
           </svg>
-          <div class="step-loader__inner" :class="{ 'is-done-icon': index < stepIndex }">
-            <span v-if="index < stepIndex">✓</span>
-            <span v-else-if="index === stepIndex">{{ Math.round(stepProgress) }}%</span>
+          <div class="step-loader__inner" :class="{ 'is-done-icon': index < activeStepIndex }">
+            <span v-if="index < activeStepIndex">✓</span>
+            <span v-else-if="index === activeStepIndex">{{ Math.round(stepProgress) }}%</span>
             <span v-else>—</span>
           </div>
         </div>
         <span
           class="step-loader__label"
-          :class="{ 'is-active': index === stepIndex, 'is-done': index < stepIndex }"
+          :class="{ 'is-active': index === activeStepIndex, 'is-done': index < activeStepIndex }"
         >
           {{ step.label }}
         </span>
@@ -37,33 +37,33 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { ref, watch } from 'vue';
+
+const props = defineProps({
+  steps: {
+    type: Array,
+    default: () => [],
+  },
+});
 
 const emit = defineEmits(['done']);
 
-const steps = [
-  { label: 'Анализируем параметры квартиры', duration: 800 },
-  { label: 'Ищем похожие объявления', duration: 1200 },
-  { label: 'Считаем и уточняем оценку', duration: 1000 },
-];
-
-const stepIndex = ref(0);
+const activeStepIndex = ref(0);
 const stepProgress = ref(0);
 const strokeDashArray = 2 * Math.PI * 20;
 
-let timer;
 let interval;
 
 function runStep(index) {
-  if (index >= steps.length) {
+  if (index >= props.steps.length) {
     emit('done');
     return;
   }
 
-  stepIndex.value = index;
+  activeStepIndex.value = index;
   stepProgress.value = 0;
   const start = Date.now();
-  const duration = steps[index].duration;
+  const duration = props.steps[index].duration || 1000;
 
   clearInterval(interval);
   interval = setInterval(() => {
@@ -73,27 +73,28 @@ function runStep(index) {
 
     if (pct >= 100) {
       clearInterval(interval);
-      timer = setTimeout(() => runStep(index + 1), 80);
+      setTimeout(() => runStep(index + 1), 200);
     }
-  }, 30);
+  }, 50);
 }
 
 function getDashOffset(index) {
-  if (index < stepIndex.value) return 0;
-  if (index === stepIndex.value) {
+  if (index < activeStepIndex.value) return 0;
+  if (index === activeStepIndex.value) {
     return strokeDashArray * (1 - stepProgress.value / 100);
   }
   return strokeDashArray;
 }
 
-onMounted(() => {
-  runStep(0);
-});
-
-onUnmounted(() => {
-  clearInterval(interval);
-  clearTimeout(timer);
-});
+watch(
+  () => props.steps,
+  (newSteps) => {
+    if (newSteps && newSteps.length > 0) {
+      runStep(0);
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>
