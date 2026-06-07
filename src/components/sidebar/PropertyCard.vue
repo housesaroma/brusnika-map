@@ -30,6 +30,9 @@
     <div class="property-card__footer">
       <div>
         <p class="property-card__price">{{ formatCompactPrice(flat.price) }}</p>
+        <p v-if="prediction?.predictedPrice" class="property-card__prediction">
+          Прогноз: {{ formatCompactPrice(prediction.predictedPrice) }}
+        </p>
       </div>
       <div v-if="priceChange" class="property-card__change" :class="priceChangeClass">
         <i :class="priceChange.icon"></i>
@@ -52,6 +55,10 @@ const props = defineProps({
   isSelected: {
     type: Boolean,
     default: false,
+  },
+  prediction: {
+    type: Object,
+    default: null,
   },
 });
 
@@ -201,6 +208,13 @@ function formatDate(date) {
   margin: 0;
   font-weight: 700;
   color: var(--app-primary);
+}
+
+.property-card__prediction {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #047857;
 }
 
 .property-card__change {

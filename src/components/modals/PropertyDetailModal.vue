@@ -30,7 +30,7 @@
           <strong>{{ formatCompactPrice(display.price) }}</strong>
           <small>{{ formatPricePerSqm(display.sqm) }}</small>
         </div>
-        <div class="detail-modal__price-card detail-modal__price-card--accent">
+        <div class="detail-modal__price-card" :class="predictionCardClass">
           <span>Прогнозная оценка</span>
           <strong>{{ predictedLabel }}</strong>
           <div v-if="predictionTrend" class="detail-modal__trend" :class="predictionTrendClass">
@@ -231,6 +231,16 @@ const predictionTrendClass = computed(() => {
   return predictionTrend.value.isUp ? 'detail-modal__trend--up' : 'detail-modal__trend--down';
 });
 
+const predictionCardClass = computed(() => {
+  if (!props.prediction?.deviationPercent) return '';
+  const deviation = props.prediction.deviationPercent;
+  if (!Number.isFinite(deviation)) return '';
+  // Если прогноз выше фактической цены (deviation > 0) — зеленый
+  if (deviation > 0) return 'detail-modal__price-card--good';
+  // Если прогноз ниже фактической цены (deviation < 0) — красный (как сейчас accent)
+  return 'detail-modal__price-card--accent';
+});
+
 const statusText = computed(() => {
   const publishedAt = display.value.publicationDate;
   const dateLabel = publishedAt ? formatFlatDate(publishedAt) : 'Дата не указана';
@@ -303,6 +313,11 @@ const statusText = computed(() => {
 .detail-modal__price-card--accent {
   border-color: rgba(255, 0, 30, 0.25);
   background: rgba(255, 0, 30, 0.06);
+}
+
+.detail-modal__price-card--good {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.06);
 }
 
 .detail-modal__trend {

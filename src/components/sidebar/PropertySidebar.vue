@@ -22,6 +22,7 @@
         v-for="flat in flats"
         :key="flat.id"
         :flat="flat"
+        :prediction="flat.prediction"
         :is-selected="flat.id === selectedFlatId"
         @click="emit('flat-click', flat)"
       />
