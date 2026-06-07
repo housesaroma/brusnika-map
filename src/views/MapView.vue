@@ -292,7 +292,26 @@ const closedSelectedRings = computed(() =>
   selectedPolygons.value.map((polygon) => closeRing(polygon.points)).filter(Boolean)
 );
 
-const tableRows = computed(() => displayFlats.value.map((flat) => buildFlatTableRow(flat)));
+function getPolygonNameForFlat(flat) {
+  if (!flat?.center || !Array.isArray(flat.center)) return null;
+  for (const polygon of polygons.value) {
+    if (polygon.points?.length >= 3) {
+      const ring = closeRing(polygon.points);
+      if (ring && isPointInside(flat.center, ring)) {
+        return polygon.name || 'Полигон';
+      }
+    }
+  }
+  return null;
+}
+
+const tableRows = computed(() => 
+  displayFlats.value.map((flat) => {
+    const row = buildFlatTableRow(flat);
+    row.polygon = getPolygonNameForFlat(flat) || '—';
+    return row;
+  })
+);
 
 const filteredFlats = computed(() => applyFiltersToFlats(flats.value, filters.value));
 
@@ -603,6 +622,10 @@ async function loadFlats(reason = 'filters') {
       const address = addressByCoord.get(flat.coordKey);
       return address ? { ...flat, address } : flat;
     });
+    
+    // Загружаем predictions для всех квартир
+    await loadFlatsPredictions();
+    
     flatsLoadedOnce.value = true;
   } catch (error) {
     console.error(error);
@@ -794,6 +817,43 @@ async function fetchPrediction(flatId) {
     console.error(error);
   } finally {
     predictionLoading.value = false;
+  }
+}
+
+async function loadFlatsPredictions() {
+  if (!flats.value.length) return;
+  
+  try {
+    const flatIds = flats.value.map(f => f.id).slice(0, 100); // Ограничиваем до 100 для производительности
+    const predictions = await Promise.all(
+      flatIds.map(async (id) => {
+        try {
+          const { data } = await predictionsApi.getFlatPrediction(id);
+          return { id, prediction: normalizePrediction(data) };
+        } catch {
+          return { id, prediction: null };
+        }
+      })
+    );
+
+    const predictionMap = new Map(
+      predictions.filter(p => p.prediction).map(p => [p.id, p.prediction])
+    );
+    
+    // Обновляем flats с predictions
+    flats.value = flats.value.map(flat => {
+      const prediction = predictionMap.get(flat.id);
+      if (prediction) {
+        return {
+          ...flat,
+          predictedPrice: prediction.predictedPrice,
+          deviationPercent: prediction.deviationPercent,
+        };
+      }
+      return flat;
+    });
+  } catch (error) {
+    console.warn('Failed to load flats predictions', error);
   }
 }
 

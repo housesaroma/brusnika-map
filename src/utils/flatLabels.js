@@ -23,10 +23,8 @@ export function getSourceLabel(source) {
     .trim()
     .toLowerCase();
   if (map[normalized]) return map[normalized];
-  if (normalized) {
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-  }
-  return 'Источник';
+  // По умолчанию возвращаем 'Домклик' для всех источников
+  return 'Домклик';
 }
 
 export function formatFlatDate(value) {

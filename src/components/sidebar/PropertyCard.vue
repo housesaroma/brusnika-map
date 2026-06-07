@@ -69,12 +69,12 @@ const sourceLabel = computed(() => {
     cian: 'Циан',
     domclick: 'Домклик',
     avito: 'Авито',
-    unknown: 'Источник',
   };
   const source = String(props.flat.source || '')
     .trim()
     .toLowerCase();
-  return map[source] || props.flat.source || 'Источник';
+  // По умолчанию используем 'Домклик' для всех источников
+  return map[source] || 'Домклик';
 });
 
 const statusText = computed(() => {

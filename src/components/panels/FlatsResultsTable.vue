@@ -97,7 +97,7 @@
           header="Адрес"
           sortable
           :show-filter-menu="false"
-          style="min-width: 140px"
+          style="min-width: 50px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText
@@ -109,20 +109,10 @@
           </template>
         </Column>
 
-        <!-- НОВЫЙ ФИЛЬТР: Район -->
-        <Column field="district" header="Район" sortable style="min-width: 100px">
-          <template #filter="{ filterModel, filterCallback }">
-            <InputText
-              v-model="filterModel.value"
-              type="text"
-              placeholder="Район"
-              @input="filterCallback()"
-            />
-          </template>
-        </Column>
+        <!-- Удалили колонку "Район" -->
 
         <!-- НОВЫЙ ФИЛЬТР: Полигон -->
-        <Column field="polygon" header="Полигон" sortable style="min-width: 100px">
+        <Column field="polygon" header="Полигон" sortable style="min-width: 27px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -133,7 +123,7 @@
           </template>
         </Column>
 
-        <Column field="rooms" header="Комнат" sortable data-type="numeric" style="min-width: 75px">
+        <Column field="rooms" header="Комнат" sortable data-type="numeric" style="min-width: 20px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -149,7 +139,7 @@
           header="Площадь, м²"
           sortable
           data-type="numeric"
-          style="min-width: 85px"
+          style="min-width: 23px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText
@@ -161,7 +151,7 @@
           </template>
         </Column>
 
-        <Column field="floor" header="Этаж" sortable data-type="numeric" style="min-width: 70px">
+        <Column field="floor" header="Этаж" sortable data-type="numeric" style="min-width: 18px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -172,8 +162,7 @@
           </template>
         </Column>
 
-        <!-- НОВЫЙ ФИЛЬТР: Год постройки -->
-        <Column field="buildYear" header="Год" sortable data-type="numeric" style="min-width: 75px">
+        <Column field="buildYear" header="Год" sortable data-type="numeric" style="min-width: 22px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -185,7 +174,7 @@
         </Column>
 
         <!-- НОВЫЙ ФИЛЬТР: Материал стен -->
-        <Column field="material" header="Материал" sortable style="min-width: 100px">
+        <Column field="material" header="Материал" sortable style="min-width: 27px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -201,10 +190,43 @@
           header="Цена"
           sortable
           sort-field="price"
-          style="min-width: 100px"
+          style="min-width: 28px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="Цена" @input="filterCallback()" />
+          </template>
+        </Column>
+
+        <Column
+          field="predictedPriceLabel"
+          header="Прогноз"
+          sortable
+          sort-field="predictedPrice"
+          style="min-width: 28px"
+        >
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" placeholder="Прогноз" @input="filterCallback()" />
+          </template>
+          <template #body="{ data }">
+            <span v-if="data.predictedPrice" :class="deviationClass(data.deviationPercent)">
+              {{ data.predictedPriceLabel }}
+            </span>
+            <span v-else>—</span>
+          </template>
+        </Column>
+
+        <Column
+          field="deviationLabel"
+          header="Откл."
+          sortable
+          sort-field="deviationPercent"
+          style="min-width: 23px"
+        >
+          <template #body="{ data }">
+            <span v-if="data.deviationPercent != null" :class="deviationClass(data.deviationPercent)">
+              {{ data.deviationLabel }}
+            </span>
+            <span v-else>—</span>
           </template>
         </Column>
 
@@ -213,14 +235,14 @@
           header="Цена / м²"
           sortable
           sort-field="sqm"
-          style="min-width: 100px"
+          style="min-width: 27px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="₽/м²" @input="filterCallback()" />
           </template>
         </Column>
 
-        <Column field="sourceLabel" header="Источник" sortable style="min-width: 95px">
+        <Column field="sourceLabel" header="Источник" sortable style="min-width: 25px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText
               v-model="filterModel.value"
@@ -230,7 +252,7 @@
           </template>
         </Column>
 
-        <Column field="statusLabel" header="Статус" sortable style="min-width: 100px">
+        <Column field="statusLabel" header="Статус" sortable style="min-width: 27px">
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="Статус" @input="filterCallback()" />
           </template>
@@ -238,10 +260,10 @@
 
         <Column
           field="publishedLabel"
-          header="Опубликовано"
+          header="Дата"
           sortable
           sort-field="publishedAt"
-          style="min-width: 110px"
+          style="min-width: 25px"
         >
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="Дата" @input="filterCallback()" />
@@ -250,10 +272,10 @@
 
         <Column
           field="priceChangeLabel"
-          header="Изм. цены"
+          header="Изм."
           sortable
           sort-field="priceChangePercent"
-          style="min-width: 90px"
+          style="min-width: 23px"
         >
           <template #body="{ data }">
             <span
@@ -314,14 +336,13 @@ const panelHeight = ref(DEFAULT_HEIGHT);
 const isFullscreen = ref(false);
 const isResizing = ref(false);
 const skeletonRows = Array.from({ length: 8 }, (_, index) => index);
-// Увеличили количество ячеек для скелетона, так как колонок стало больше
-const skeletonCells = Array.from({ length: 14 }, (_, index) => index);
+// Обновленное количество ячеек для скелетона (убрали район, добавили прогноз и отклонение)
+const skeletonCells = Array.from({ length: 15 }, (_, index) => index);
 const globalFilter = ref('');
 
 // Добавлены новые поля для глобальной фильтрации
 const globalFilterFields = [
   'address',
-  'district',
   'polygon',
   'rooms',
   'area',
@@ -329,6 +350,8 @@ const globalFilterFields = [
   'buildYear',
   'material',
   'priceLabel',
+  'predictedPriceLabel',
+  'deviationLabel',
   'sqmLabel',
   'sourceLabel',
   'statusLabel',
@@ -340,7 +363,6 @@ const globalFilterFields = [
 const tableFilters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS },
   address: { value: null, matchMode: FilterMatchMode.CONTAINS },
-  district: { value: null, matchMode: FilterMatchMode.CONTAINS },
   polygon: { value: null, matchMode: FilterMatchMode.CONTAINS },
   rooms: { value: null, matchMode: FilterMatchMode.EQUALS },
   area: { value: null, matchMode: FilterMatchMode.EQUALS },
@@ -348,10 +370,13 @@ const tableFilters = ref({
   buildYear: { value: null, matchMode: FilterMatchMode.EQUALS },
   material: { value: null, matchMode: FilterMatchMode.CONTAINS },
   priceLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  predictedPriceLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  deviationLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
   sqmLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
   sourceLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
   statusLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
   publishedLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  priceChangeLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
 });
 
 const panelStyle = computed(() => {
@@ -424,6 +449,11 @@ function rowClass(data) {
   return data.id === props.selectedFlatId ? 'flats-table-panel__row--selected' : '';
 }
 
+function deviationClass(deviation) {
+  if (!Number.isFinite(deviation)) return '';
+  return deviation > 0 ? 'trend--up' : 'trend--down';
+}
+
 function handleRowClick(event) {
   const flat = event?.data?.flat;
   if (flat) emit('flat-click', flat);
@@ -459,8 +489,8 @@ onBeforeUnmount(() => {
 
 .flats-table-panel__skeleton-row {
   display: grid;
-  /* Адаптировали сетку скелетона под увеличенное количество колонок */
-  grid-template-columns: 2fr repeat(13, minmax(0, 1fr));
+  /* Обновленная сетка скелетона под новое количество колонок (15) */
+  grid-template-columns: 2fr repeat(14, minmax(0, 1fr));
   gap: 12px;
   align-items: center;
 }
@@ -530,8 +560,13 @@ onBeforeUnmount(() => {
 }
 
 .flats-table-panel__search {
-  min-width: 220px;
-  max-width: 320px;
+  min-width: 180px;
+  max-width: 250px;
+}
+
+.flats-table-panel__search :deep(.p-inputtext) {
+  font-size: 0.75rem;
+  padding: 4px 8px;
 }
 
 .flats-table-panel__actions {
@@ -565,6 +600,13 @@ onBeforeUnmount(() => {
   opacity: 0.4;
 }
 
+.flats-table-panel__datatable :deep(.p-column-filter-row .p-inputtext) {
+  font-size: 0.65rem !important;
+  padding: 2px 4px !important;
+  min-height: 24px !important;
+  width: 60px !important;
+}
+
 /* Стилизация ползунков-разделителей колонок PrimeVue (чтобы было видно область перетаскивания) */
 .flats-table-panel__datatable :deep(.p-datatable-column-resizer) {
   width: 8px;
@@ -590,5 +632,15 @@ onBeforeUnmount(() => {
 .trend--down {
   color: #b91c1c;
   font-weight: 600;
+}
+
+.flats-table-panel__datatable :deep(.p-datatable-thead > tr > th) {
+  font-size: 0.75rem;
+  padding: 8px 6px;
+}
+
+.flats-table-panel__datatable :deep(.p-datatable-tbody > tr > td) {
+  font-size: 0.8rem;
+  padding: 8px 6px;
 }
 </style>

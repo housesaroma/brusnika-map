@@ -576,6 +576,43 @@
           "coords": {
             "type": "string",
             "nullable": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceChangePercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "buildYear": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "material": {
+            "type": "string",
+            "nullable": true
+          },
+          "polygon": {
+            "type": "string",
+            "nullable": true
+          },
+          "predictedPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "deviationPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false
