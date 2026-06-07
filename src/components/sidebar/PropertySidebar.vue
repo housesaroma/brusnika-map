@@ -1,16 +1,17 @@
 <template>
   <aside v-if="isOpen" class="sidebar">
-    <div class="sidebar__header">
-      <div class="sidebar__title">
+    <div class="sidebar__header" @click="handleTitleClick">
+      <div class="sidebar__title" :class="{ 'sidebar__title--clickable': flats.length === 1 }">
         <div class="sidebar__icon">
           <i class="pi pi-building"></i>
         </div>
         <div>
           <h2>{{ building?.address || 'Дом' }}</h2>
           <p v-if="building?.yearBuilt">Год постройки: {{ formatYear(building.yearBuilt) }}</p>
+          <p v-if="flats.length === 1" class="sidebar__hint">Нажмите для просмотра квартиры</p>
         </div>
       </div>
-      <Button icon="pi pi-times" text rounded class="sidebar__close" @click="emit('close')" />
+      <Button icon="pi pi-times" text rounded class="sidebar__close" @click.stop="emit('close')" />
     </div>
 
     <div class="sidebar__count">
@@ -35,7 +36,7 @@
 import Button from 'primevue/button';
 import PropertyCard from './PropertyCard.vue';
 
-defineProps({
+const props = defineProps({
   building: {
     type: Object,
     default: null,
@@ -54,7 +55,14 @@ defineProps({
   },
 });
 
-const emit = defineEmits(['flat-click', 'close']);
+const emit = defineEmits(['flat-click', 'close', 'single-flat-click']);
+
+function handleTitleClick() {
+  // Если в доме только 1 квартира, эмитим событие для открытия модального окна
+  if (props.flats?.length === 1) {
+    emit('single-flat-click', props.flats[0]);
+  }
+}
 
 function formatYear(value) {
   if (!value) return '—';
@@ -91,6 +99,21 @@ function formatYear(value) {
   display: flex;
   gap: 12px;
   align-items: flex-start;
+}
+
+.sidebar__title--clickable {
+  cursor: pointer;
+}
+
+.sidebar__title--clickable:hover .sidebar__icon {
+  background: rgba(255, 0, 30, 0.2);
+}
+
+.sidebar__hint {
+  margin: 4px 0 0;
+  font-size: 0.7rem;
+  color: var(--app-primary);
+  font-weight: 600;
 }
 
 .sidebar__title h2 {

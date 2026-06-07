@@ -62,9 +62,10 @@
         :building="selectedBuilding"
         :flats="selectedBuildingFlats"
         :selected-flat-id="selectedFlat?.id"
-        :is-open="!!selectedBuilding && !isResultsSidebarOpen && !showResultsTable"
+        :is-open="!!selectedBuilding && !isResultsSidebarOpen && !showResultsTable && selectedBuildingFlats.length > 1"
         @close="clearBuildingSelection"
         @flat-click="handleFlatClick"
+        @single-flat-click="handleSingleFlatInBuilding"
       />
 
       <FilterResultsSidebar
@@ -663,11 +664,42 @@ function handleBuildingClick(building) {
   selectedBuilding.value = building;
   showResultsTable.value = false;
   selectedFlat.value = null;
+  
+  // Если в доме только 1 квартира — сразу открываем PropertyDetailModal
+  // Считаем вручную, так как selectedBuildingFlats еще не обновился реактивно
+  if (building?.id) {
+    const byId = displayFlats.value.filter((flat) => flat.buildingId === building.id);
+    if (byId.length === 1) {
+      handleSingleFlatInBuilding(byId[0]);
+      return;
+    }
+  }
+  const selectedCoordKey = building?.coordKey;
+  if (selectedCoordKey) {
+    const byCoord = displayFlats.value.filter((flat) => flat.coordKey === selectedCoordKey);
+    if (byCoord.length === 1) {
+      handleSingleFlatInBuilding(byCoord[0]);
+    }
+  }
 }
 
 function clearBuildingSelection() {
   selectedBuilding.value = null;
   selectedFlat.value = null;
+}
+
+function handleSingleFlatInBuilding(flat) {
+  // Если в доме только 1 квартира — сразу открываем PropertyDetailModal и закрываем sidebar
+  if (!flat?.id) return;
+  selectedFlat.value = flat;
+  selectedBuilding.value = null;
+  showDetailModal.value = true;
+  flatDetails.value = null;
+  closestMetro.value = [];
+  flatAnalogs.value = [];
+  fetchFlatDetails(flat);
+  fetchPrediction(flat.id);
+  fetchAnalogs(flat.id);
 }
 
 function handleFlatClick(flat) {
