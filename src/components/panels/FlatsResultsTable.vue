@@ -104,12 +104,11 @@
               v-model="filterModel.value"
               type="text"
               placeholder="Адрес"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
               @input="filterCallback()"
             />
           </template>
         </Column>
-
-        <!-- Удалили колонку "Район" -->
 
         <!-- НОВЫЙ ФИЛЬТР: Полигон -->
         <Column field="polygon" header="Полигон" sortable style="min-width: 27px">
@@ -118,6 +117,7 @@
               v-model="filterModel.value"
               type="text"
               placeholder="Полигон"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
               @input="filterCallback()"
             />
           </template>
@@ -129,6 +129,7 @@
               v-model="filterModel.value"
               type="number"
               placeholder="Кол-во"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
               @input="filterCallback()"
             />
           </template>
@@ -146,6 +147,7 @@
               v-model="filterModel.value"
               type="number"
               placeholder="м²"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
               @input="filterCallback()"
             />
           </template>
@@ -157,6 +159,7 @@
               v-model="filterModel.value"
               type="number"
               placeholder="Этаж"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
               @input="filterCallback()"
             />
           </template>
@@ -168,6 +171,7 @@
               v-model="filterModel.value"
               type="number"
               placeholder="Год"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
               @input="filterCallback()"
             />
           </template>
@@ -180,23 +184,26 @@
               v-model="filterModel.value"
               type="text"
               placeholder="Материал"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
               @input="filterCallback()"
             />
           </template>
         </Column>
 
-        <Column
-          field="priceLabel"
-          header="Цена"
-          sortable
-          sort-field="price"
-          style="min-width: 28px"
-        >
+        <Column field="priceLabel" header="Цена" sortable sort-field="price">
           <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" placeholder="Цена" @input="filterCallback()" />
+            <InputText
+              v-model="filterModel.value"
+              placeholder="Цена"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
+              @input="filterCallback()"
+            />
           </template>
           <template #body="{ data }">
-            <span v-if="data.deviationPercent != null && data.deviationPercent > 0" class="price--favorable">
+            <span
+              v-if="data.deviationPercent != null && data.deviationPercent > 0"
+              class="price--favorable"
+            >
               {{ data.priceLabel }}
             </span>
             <span v-else>{{ data.priceLabel }}</span>
@@ -211,7 +218,12 @@
           style="min-width: 28px"
         >
           <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" placeholder="Прогноз" @input="filterCallback()" />
+            <InputText
+              v-model="filterModel.value"
+              placeholder="Прогноз"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
+              @input="filterCallback()"
+            />
           </template>
           <template #body="{ data }">
             <span v-if="data.predictedPrice" :class="deviationClass(data.deviationPercent)">
@@ -229,7 +241,10 @@
           style="min-width: 23px"
         >
           <template #body="{ data }">
-            <span v-if="data.deviationPercent != null" :class="deviationClass(data.deviationPercent)">
+            <span
+              v-if="data.deviationPercent != null"
+              :class="deviationClass(data.deviationPercent)"
+            >
               {{ data.deviationLabel }}
             </span>
             <span v-else>—</span>
@@ -244,7 +259,12 @@
           style="min-width: 27px"
         >
           <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" placeholder="₽/м²" @input="filterCallback()" />
+            <InputText
+              v-model="filterModel.value"
+              placeholder="₽/м²"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
+              @input="filterCallback()"
+            />
           </template>
         </Column>
 
@@ -253,6 +273,7 @@
             <InputText
               v-model="filterModel.value"
               placeholder="Источник"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
               @input="filterCallback()"
             />
           </template>
@@ -260,7 +281,12 @@
 
         <Column field="statusLabel" header="Статус" sortable style="min-width: 27px">
           <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" placeholder="Статус" @input="filterCallback()" />
+            <InputText
+              v-model="filterModel.value"
+              placeholder="Статус"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
+              @input="filterCallback()"
+            />
           </template>
         </Column>
 
@@ -272,7 +298,12 @@
           style="min-width: 25px"
         >
           <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" placeholder="Дата" @input="filterCallback()" />
+            <InputText
+              v-model="filterModel.value"
+              placeholder="Дата"
+              style="font-size: 0.75rem; padding: 4px 8px; min-height: 24px; width: 100px"
+              @input="filterCallback()"
+            />
           </template>
         </Column>
 
