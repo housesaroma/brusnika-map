@@ -94,6 +94,7 @@
         :selected-flat-id="selectedFlat?.id"
         @close="closeResultsTable"
         @flat-click="handleFlatClick"
+        @flat-remove="handleFlatRemove"
       />
     </div>
 
@@ -736,6 +737,13 @@ function handleFlatClick(flat) {
   fetchFlatDetails(flat);
   fetchPrediction(flat.id);
   fetchAnalogs(flat.id);
+}
+
+function handleFlatRemove(flat) {
+  if (!flat?.id) return;
+  
+  // Удаляем квартиру из массива flats
+  flats.value = flats.value.filter((f) => f.id !== flat.id);
 }
 
 function handleAnalogSelect(analog) {

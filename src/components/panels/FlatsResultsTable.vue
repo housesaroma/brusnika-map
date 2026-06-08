@@ -33,12 +33,22 @@
         </IconField>
 
         <div class="flats-table-panel__actions">
+          <Menu ref="exportMenuRef" :model="exportMenuItems" :popup="true" />
+          <Menu ref="contextMenuRef" :model="contextMenuItems" :popup="true" />
+          
           <Button
             :title="isFullscreen ? 'Выйти из полноэкранного режима' : 'На весь экран'"
             :icon="isFullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
             text
             rounded
             @click="toggleFullscreen"
+          />
+          <Button
+            title="Скачать таблицу"
+            icon="pi pi-download"
+            text
+            rounded
+            @click="showExportMenu"
           />
           <Button
             title="Скрыть таблицу"
@@ -75,6 +85,8 @@
         class="flats-table-panel__datatable"
         :row-class="rowClass"
         @row-click="handleRowClick"
+        @row-contextmenu="handleRowContextMenu"
+        @contextmenu.prevent
       >
         <template #loading>
           <div class="flats-table-panel__skeleton">
@@ -338,7 +350,10 @@ import InputText from 'primevue/inputtext';
 import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
 import Skeleton from 'primevue/skeleton';
+import Menu from 'primevue/menu';
 import { FilterMatchMode } from '@primevue/core/api';
+import { exportToExcel, exportToCSV } from '@/utils/export';
+import { useToast } from 'primevue/usetoast';
 
 const props = defineProps({
   isOpen: {
@@ -363,7 +378,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'flat-click']);
+const emit = defineEmits(['close', 'flat-click', 'flat-remove']);
 
 const DEFAULT_HEIGHT = 50;
 const MIN_HEIGHT = 220;
@@ -376,6 +391,11 @@ const skeletonRows = Array.from({ length: 8 }, (_, index) => index);
 // Обновленное количество ячеек для скелетона (убрали район, добавили прогноз и отклонение)
 const skeletonCells = Array.from({ length: 15 }, (_, index) => index);
 const globalFilter = ref('');
+
+const toast = useToast();
+const exportMenuRef = ref(null);
+const contextMenuRef = ref(null);
+const contextMenuFlat = ref(null);
 
 // Добавлены новые поля для глобальной фильтрации
 const globalFilterFields = [
@@ -415,6 +435,27 @@ const tableFilters = ref({
   publishedLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
   priceChangeLabel: { value: null, matchMode: FilterMatchMode.CONTAINS },
 });
+
+const contextMenuItems = computed(() => [
+  {
+    label: 'Удалить из списка',
+    icon: 'pi pi-trash',
+    command: () => removeFlatFromList(contextMenuFlat.value),
+  },
+]);
+
+const exportMenuItems = ref([
+  {
+    label: 'Excel (.xlsx)',
+    icon: 'pi pi-file-excel',
+    command: () => handleExportFormat('excel'),
+  },
+  {
+    label: 'CSV (.csv)',
+    icon: 'pi pi-file',
+    command: () => handleExportFormat('csv'),
+  },
+]);
 
 const panelStyle = computed(() => {
   if (isFullscreen.value) return { height: '100%' };
@@ -502,6 +543,63 @@ function deviationClass(deviation) {
 function handleRowClick(event) {
   const flat = event?.data?.flat;
   if (flat) emit('flat-click', flat);
+}
+
+function showExportMenu(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  exportMenuRef.value?.toggle(event);
+}
+
+function handleExportFormat(format) {
+  if (!props.rows || props.rows.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Экспорт',
+      detail: 'Нет данных для экспорта',
+      life: 3000,
+    });
+    return;
+  }
+
+  const filename = 'flats_export';
+  if (format === 'excel') {
+    exportToExcel(props.rows, filename);
+    toast.add({
+      severity: 'success',
+      summary: 'Экспорт',
+      detail: `Скачан Excel файл (${props.rows.length} записей)`,
+      life: 3000,
+    });
+  } else if (format === 'csv') {
+    exportToCSV(props.rows, filename);
+    toast.add({
+      severity: 'success',
+      summary: 'Экспорт',
+      detail: `Скачан CSV файл (${props.rows.length} записей)`,
+      life: 3000,
+    });
+  }
+}
+
+function handleRowContextMenu(event) {
+  const flat = event?.data?.flat;
+  if (!flat) return;
+
+  contextMenuFlat.value = flat;
+  contextMenuRef.value?.toggle(event.originalEvent);
+}
+
+function removeFlatFromList(flat) {
+  if (!flat || !flat.id) return;
+
+  emit('flat-remove', flat);
+  toast.add({
+    severity: 'success',
+    summary: 'Удалено',
+    detail: 'Объект удален из списка',
+    life: 3000,
+  });
 }
 
 onBeforeUnmount(() => {
@@ -617,6 +715,7 @@ onBeforeUnmount(() => {
 .flats-table-panel__actions {
   display: flex;
   gap: 4px;
+  align-items: center;
 }
 
 .flats-table-panel__body {
