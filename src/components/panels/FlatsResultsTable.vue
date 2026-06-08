@@ -195,6 +195,12 @@
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" placeholder="Цена" @input="filterCallback()" />
           </template>
+          <template #body="{ data }">
+            <span v-if="data.deviationPercent != null && data.deviationPercent > 0" class="price--favorable">
+              {{ data.priceLabel }}
+            </span>
+            <span v-else>{{ data.priceLabel }}</span>
+          </template>
         </Column>
 
         <Column
@@ -446,7 +452,15 @@ function toggleFullscreen() {
 }
 
 function rowClass(data) {
-  return data.id === props.selectedFlatId ? 'flats-table-panel__row--selected' : '';
+  const classes = [];
+  if (data.id === props.selectedFlatId) {
+    classes.push('flats-table-panel__row--selected');
+  }
+  // Выгодная квартира: прогнозная цена выше объявленной (deviationPercent > 0)
+  if (data.deviationPercent != null && data.deviationPercent > 0) {
+    classes.push('flats-table-panel__row--favorable');
+  }
+  return classes.join(' ');
 }
 
 function deviationClass(deviation) {
@@ -593,6 +607,16 @@ onBeforeUnmount(() => {
 
 .flats-table-panel__datatable :deep(.flats-table-panel__row--selected) {
   background: rgba(255, 0, 30, 0.08) !important;
+}
+
+/* Выгодная квартира: прогнозная цена выше объявленной */
+.flats-table-panel__datatable :deep(.flats-table-panel__row--favorable) {
+  background: rgba(4, 120, 87, 0.08) !important;
+}
+
+.price--favorable {
+  color: #047857;
+  font-weight: 600;
 }
 
 /* Делаем дефолтные плейсхолдеры в инпутах фильтрации более прозрачными */
