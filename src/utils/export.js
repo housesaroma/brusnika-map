@@ -22,7 +22,7 @@ export function exportToExcel(rows, filename = 'table_export') {
     Год: row.buildYear ?? '—',
     Материал: row.material || '—',
     Цена: formatPrice(row.price),
-    'Прогноз': formatPrice(row.predictedPrice),
+    Прогноз: formatPrice(row.predictedPrice),
     'Отклонение, %': row.deviationPercent != null ? row.deviationPercent.toFixed(1) : '—',
     'Цена / м²': formatPricePerSqm(row.sqm),
     Источник: row.sourceLabel || '—',
@@ -33,24 +33,24 @@ export function exportToExcel(rows, filename = 'table_export') {
 
   // Создаем workbook и worksheet
   const ws = XLSX.utils.json_to_sheet(data);
-  
+
   // Настраиваем ширину колонок
   const colWidths = [
-    { wch: 50 },  // Адрес
-    { wch: 20 },  // Полигон
-    { wch: 10 },  // Комнат
-    { wch: 12 },  // Площадь
-    { wch: 10 },  // Этаж
-    { wch: 10 },  // Год
-    { wch: 15 },  // Материал
-    { wch: 15 },  // Цена
-    { wch: 15 },  // Прогноз
-    { wch: 12 },  // Отклонение
-    { wch: 15 },  // Цена / м²
-    { wch: 12 },  // Источник
-    { wch: 15 },  // Статус
-    { wch: 12 },  // Дата
-    { wch: 12 },  // Изменение
+    { wch: 50 }, // Адрес
+    { wch: 20 }, // Полигон
+    { wch: 10 }, // Комнат
+    { wch: 12 }, // Площадь
+    { wch: 10 }, // Этаж
+    { wch: 10 }, // Год
+    { wch: 15 }, // Материал
+    { wch: 15 }, // Цена
+    { wch: 15 }, // Прогноз
+    { wch: 12 }, // Отклонение
+    { wch: 15 }, // Цена / м²
+    { wch: 12 }, // Источник
+    { wch: 15 }, // Статус
+    { wch: 12 }, // Дата
+    { wch: 12 }, // Изменение
   ];
   ws['!cols'] = colWidths;
 
@@ -84,7 +84,7 @@ export function exportToCSV(rows, filename = 'table_export') {
     Год: row.buildYear ?? '—',
     Материал: row.material || '—',
     Цена: formatPrice(row.price),
-    'Прогноз': formatPrice(row.predictedPrice),
+    Прогноз: formatPrice(row.predictedPrice),
     'Отклонение, %': row.deviationPercent != null ? row.deviationPercent.toFixed(1) : '—',
     'Цена / м²': formatPricePerSqm(row.sqm),
     Источник: row.sourceLabel || '—',
@@ -97,13 +97,15 @@ export function exportToCSV(rows, filename = 'table_export') {
   const headers = Object.keys(data[0]);
   const csvRows = [
     headers.join(';'), // Заголовки
-    ...data.map((row) => 
-      headers.map((fieldName) => {
-        const value = row[fieldName];
-        // Экранируем кавычки и оборачиваем в кавычки, если есть точка с запятой
-        const escaped = String(value).replace(/"/g, '""');
-        return `"${escaped}"`;
-      }).join(';')
+    ...data.map((row) =>
+      headers
+        .map((fieldName) => {
+          const value = row[fieldName];
+          // Экранируем кавычки и оборачиваем в кавычки, если есть точка с запятой
+          const escaped = String(value).replace(/"/g, '""');
+          return `"${escaped}"`;
+        })
+        .join(';')
     ),
   ];
 

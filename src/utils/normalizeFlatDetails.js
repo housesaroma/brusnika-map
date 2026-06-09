@@ -29,7 +29,8 @@ export function normalizeFlatDetails(data) {
   const area = Number(data.area ?? data.Area ?? 0);
   const kitchenArea = Number(data.kitchenArea ?? data.KitchenArea ?? 0);
 
-  const rawPubDate = data.publicationDate ?? data.PublicationDate ?? data.publishedAt ?? data.PublishedAt ?? null;
+  const rawPubDate =
+    data.publicationDate ?? data.PublicationDate ?? data.publishedAt ?? data.PublishedAt ?? null;
   const publicationDate = isValidDate(rawPubDate) ? rawPubDate : null;
 
   return {

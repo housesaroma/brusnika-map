@@ -45,7 +45,7 @@ export function normalizeFlat(flat, buildingMeta = {}) {
     '';
   // По умолчанию используем 'domclick' для всех источников
   const source = rawSource || 'domclick';
-  
+
   const rawPublishedAt =
     flat.PublishedAt ??
     flat.publishedAt ??
@@ -54,7 +54,7 @@ export function normalizeFlat(flat, buildingMeta = {}) {
     flat.publishedDate ??
     null;
   const publishedAt = isValidDate(rawPublishedAt) ? rawPublishedAt : null;
-  
+
   const rawUnpublishedAt =
     flat.UnpublishedAt ??
     flat.unpublishedAt ??
@@ -63,7 +63,7 @@ export function normalizeFlat(flat, buildingMeta = {}) {
     flat.unpublishedDate ??
     null;
   const unpublishedAt = isValidDate(rawUnpublishedAt) ? rawUnpublishedAt : null;
-  
+
   return {
     id: flat.Id || flat.id,
     area: Number(flat.area ?? flat.Area ?? 0),

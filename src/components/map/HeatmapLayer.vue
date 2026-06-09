@@ -24,7 +24,7 @@ const props = defineProps({
 function getPointStyle(point) {
   const size = 80 + point.value * 120; // Размер от 80px до 200px
   const color = getHeatColor(point.value);
-  
+
   return {
     width: `${size}px`,
     height: `${size}px`,
@@ -37,7 +37,7 @@ function getPointStyle(point) {
 function getHeatColor(value) {
   // Нормализуем значение от 0 до 1
   value = Math.max(0, Math.min(1, value));
-  
+
   const hue = (1 - value) * 240; // От синего (240) до красного (0)
   return `hsla(${hue}, 100%, 50%, 0.4)`;
 }

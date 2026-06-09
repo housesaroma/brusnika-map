@@ -8,10 +8,7 @@
     </template>
 
     <div v-if="loading" class="valuation-modal__loader">
-      <StepLoader 
-        :steps="evaluationSteps" 
-        @done="handleLoadingDone"
-      />
+      <StepLoader :steps="evaluationSteps" @done="handleLoadingDone" />
     </div>
 
     <div v-else-if="result" class="valuation-modal__result">
@@ -172,12 +169,12 @@ function getCityId() {
   if (props.selectedCity?.id) {
     return props.selectedCity.id;
   }
-  
+
   // Fallback: пробуем получить из URL
   const urlParams = new URLSearchParams(window.location.search);
   const cityId = urlParams.get('cityId');
   if (cityId) return cityId;
-  
+
   // Последний fallback - дефолтный CityId
   return 'a0ee0000-0000-0000-0000-000000000001';
 }
@@ -185,7 +182,7 @@ function getCityId() {
 function handleEvaluate() {
   loading.value = true;
   result.value = null;
-  
+
   // Формируем payload для API согласно DTO PredictByParametersRequest
   const payload = {
     FlatArea: params.value.area,
@@ -218,7 +215,7 @@ function handleEvaluate() {
     })
     .then((response) => {
       const data = response.data;
-      
+
       // Нормализуем данные с бэкенда согласно PredictByParametersResult
       const predictedPrice = data.PredictedPrice || data.predictedPrice || 0;
       const pricePerSqm = predictedPrice > 0 ? predictedPrice / params.value.area : 0;
@@ -239,7 +236,10 @@ function handleEvaluate() {
       const materialFactor =
         params.value.material === 'monolith' ? 1.1 : params.value.material === 'brick' ? 1.05 : 1.0;
       const metroFactor = 1 - Math.max(0, params.value.metroDistance - 5) * 0.01;
-      const pricePerSqm = Math.max(65000, basePrice * renovationFactor * materialFactor * metroFactor);
+      const pricePerSqm = Math.max(
+        65000,
+        basePrice * renovationFactor * materialFactor * metroFactor
+      );
       const predictedPrice = Math.round(pricePerSqm * params.value.area);
 
       result.value = {

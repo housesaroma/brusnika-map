@@ -62,7 +62,12 @@
         :building="selectedBuilding"
         :flats="selectedBuildingFlats"
         :selected-flat-id="selectedFlat?.id"
-        :is-open="!!selectedBuilding && !isResultsSidebarOpen && !showResultsTable && selectedBuildingFlats.length > 1"
+        :is-open="
+          !!selectedBuilding &&
+          !isResultsSidebarOpen &&
+          !showResultsTable &&
+          selectedBuildingFlats.length > 1
+        "
         @close="clearBuildingSelection"
         @flat-click="handleFlatClick"
         @single-flat-click="handleSingleFlatInBuilding"
@@ -95,6 +100,7 @@
         @close="closeResultsTable"
         @flat-click="handleFlatClick"
         @flat-remove="handleFlatRemove"
+        @clear-selection="handleClearTableSelection"
       />
     </div>
 
@@ -112,8 +118,8 @@
       @select-analog="handleAnalogSelect"
     />
 
-    <ValuationModal 
-      :open="showValuation" 
+    <ValuationModal
+      :open="showValuation"
       :selected-city="selectedCity"
       @close="showValuation = false"
       @apply-filters="handleApplyValuationFilters"
@@ -306,7 +312,7 @@ function getPolygonNameForFlat(flat) {
   return null;
 }
 
-const tableRows = computed(() => 
+const tableRows = computed(() =>
   displayFlats.value.map((flat) => {
     const row = buildFlatTableRow(flat);
     row.polygon = getPolygonNameForFlat(flat) || '—';
@@ -623,10 +629,10 @@ async function loadFlats(reason = 'filters') {
       const address = addressByCoord.get(flat.coordKey);
       return address ? { ...flat, address } : flat;
     });
-    
+
     // Загружаем predictions для всех квартир
     await loadFlatsPredictions();
-    
+
     flatsLoadedOnce.value = true;
   } catch (error) {
     console.error(error);
@@ -688,7 +694,7 @@ function handleBuildingClick(building) {
   selectedBuilding.value = building;
   showResultsTable.value = false;
   selectedFlat.value = null;
-  
+
   // Если в доме только 1 квартира — сразу открываем PropertyDetailModal
   // Считаем вручную, так как selectedBuildingFlats еще не обновился реактивно
   if (building?.id) {
@@ -741,9 +747,14 @@ function handleFlatClick(flat) {
 
 function handleFlatRemove(flat) {
   if (!flat?.id) return;
-  
+
   // Удаляем квартиру из массива flats
   flats.value = flats.value.filter((f) => f.id !== flat.id);
+}
+
+function handleClearTableSelection() {
+  // Пустая функция-обработчик для сброса выделения в таблице
+  // Выделение сбрасывается внутри компонента FlatsResultsTable
 }
 
 function handleAnalogSelect(analog) {
@@ -830,9 +841,9 @@ async function fetchPrediction(flatId) {
 
 async function loadFlatsPredictions() {
   if (!flats.value.length) return;
-  
+
   try {
-    const flatIds = flats.value.map(f => f.id).slice(0, 100); // Ограничиваем до 100 для производительности
+    const flatIds = flats.value.map((f) => f.id).slice(0, 100); // Ограничиваем до 100 для производительности
     const predictions = await Promise.all(
       flatIds.map(async (id) => {
         try {
@@ -845,11 +856,11 @@ async function loadFlatsPredictions() {
     );
 
     const predictionMap = new Map(
-      predictions.filter(p => p.prediction).map(p => [p.id, p.prediction])
+      predictions.filter((p) => p.prediction).map((p) => [p.id, p.prediction])
     );
-    
+
     // Обновляем flats с predictions
-    flats.value = flats.value.map(flat => {
+    flats.value = flats.value.map((flat) => {
       const prediction = predictionMap.get(flat.id);
       if (prediction) {
         return {

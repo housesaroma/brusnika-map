@@ -119,7 +119,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 12px;
-  white-space: nowrap; 
+  white-space: nowrap;
 }
 
 .step-loader__circle {

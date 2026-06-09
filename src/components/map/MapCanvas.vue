@@ -48,13 +48,10 @@
     >
       <YandexMapDefaultSchemeLayer />
       <YandexMapDefaultFeaturesLayer />
-        <template v-if="mapReady">
+      <template v-if="mapReady">
         <YandexMapListener :settings="listenerSettings" />
 
-        <HeatmapLayer
-          v-if="heatMode && !isDrawing"
-          :points="heatPoints"
-        />
+        <HeatmapLayer v-if="heatMode && !isDrawing" :points="heatPoints" />
 
         <PolygonEditorLayer
           :map-ready="mapReady"
@@ -360,7 +357,7 @@ const listenerSettings = computed(() => ({
   onUpdate: (event) => {
     const zoom = event?.location?.zoom;
     if (Number.isFinite(zoom)) currentZoom.value = Math.round(zoom);
-    
+
     // Сохраняем экземпляр карты глобально для heatmap
     if (map.value) {
       window.yaMapsMapInstance = map.value;

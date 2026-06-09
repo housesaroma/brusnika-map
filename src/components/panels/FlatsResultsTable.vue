@@ -35,7 +35,16 @@
         <div class="flats-table-panel__actions">
           <Menu ref="exportMenuRef" :model="exportMenuItems" :popup="true" />
           <Menu ref="contextMenuRef" :model="contextMenuItems" :popup="true" />
-          
+
+          <Button
+            v-if="selectedCount > 0"
+            title="Сбросить выделение"
+            icon="pi pi-times"
+            text
+            rounded
+            severity="secondary"
+            @click="clearSelection"
+          />
           <Button
             :title="isFullscreen ? 'Выйти из полноэкранного режима' : 'На весь экран'"
             :icon="isFullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
@@ -66,6 +75,7 @@
       <!-- Добавлены resizable-columns и column-resize-mode -->
       <DataTable
         v-model:filters="tableFilters"
+        v-model:selection="selectedRows"
         :value="rows"
         :global-filter-fields="globalFilterFields"
         :loading="loading"
@@ -86,8 +96,10 @@
         :row-class="rowClass"
         @row-click="handleRowClick"
         @row-contextmenu="handleRowContextMenu"
+        @row-unselect="handleRowUnselect"
         @contextmenu.prevent
       >
+        <Column selection-mode="multiple" header-style="width: 3rem" :sortable="false" />
         <template #loading>
           <div class="flats-table-panel__skeleton">
             <div
@@ -378,7 +390,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'flat-click', 'flat-remove']);
+const emit = defineEmits(['close', 'flat-click', 'flat-remove', 'clear-selection']);
 
 const DEFAULT_HEIGHT = 50;
 const MIN_HEIGHT = 220;
@@ -391,6 +403,7 @@ const skeletonRows = Array.from({ length: 8 }, (_, index) => index);
 // Обновленное количество ячеек для скелетона (убрали район, добавили прогноз и отклонение)
 const skeletonCells = Array.from({ length: 15 }, (_, index) => index);
 const globalFilter = ref('');
+const selectedRows = ref([]);
 
 const toast = useToast();
 const exportMenuRef = ref(null);
@@ -456,6 +469,8 @@ const exportMenuItems = ref([
     command: () => handleExportFormat('csv'),
   },
 ]);
+
+const selectedCount = computed(() => selectedRows.value?.length || 0);
 
 const panelStyle = computed(() => {
   if (isFullscreen.value) return { height: '100%' };
@@ -545,6 +560,11 @@ function handleRowClick(event) {
   if (flat) emit('flat-click', flat);
 }
 
+function handleRowUnselect(_event) {
+  // Сбрасываем выделение при клике вне таблицы
+  selectedRows.value = [];
+}
+
 function showExportMenu(event) {
   event.preventDefault();
   event.stopPropagation();
@@ -552,7 +572,11 @@ function showExportMenu(event) {
 }
 
 function handleExportFormat(format) {
-  if (!props.rows || props.rows.length === 0) {
+  // Если ничего не выделено, экспортируем всю таблицу
+  const exportData =
+    selectedRows.value && selectedRows.value.length > 0 ? selectedRows.value : props.rows;
+
+  if (!exportData || exportData.length === 0) {
     toast.add({
       severity: 'warn',
       summary: 'Экспорт',
@@ -564,22 +588,27 @@ function handleExportFormat(format) {
 
   const filename = 'flats_export';
   if (format === 'excel') {
-    exportToExcel(props.rows, filename);
+    exportToExcel(exportData, filename);
     toast.add({
       severity: 'success',
       summary: 'Экспорт',
-      detail: `Скачан Excel файл (${props.rows.length} записей)`,
+      detail: `Скачан Excel файл (${exportData.length} записей)`,
       life: 3000,
     });
   } else if (format === 'csv') {
-    exportToCSV(props.rows, filename);
+    exportToCSV(exportData, filename);
     toast.add({
       severity: 'success',
       summary: 'Экспорт',
-      detail: `Скачан CSV файл (${props.rows.length} записей)`,
+      detail: `Скачан CSV файл (${exportData.length} записей)`,
       life: 3000,
     });
   }
+}
+
+function clearSelection() {
+  selectedRows.value = [];
+  emit('clear-selection');
 }
 
 function handleRowContextMenu(event) {
@@ -733,6 +762,10 @@ onBeforeUnmount(() => {
 
 .flats-table-panel__datatable :deep(.p-datatable-tbody > tr) {
   cursor: pointer;
+}
+
+.flats-table-panel__datatable :deep(.p-datatable-tbody > tr.p-highlight) {
+  background: rgba(255, 0, 30, 0.08) !important;
 }
 
 .flats-table-panel__datatable :deep(.flats-table-panel__row--selected) {

@@ -33,11 +33,7 @@
         </div>
       </button>
 
-      <button
-        v-if="hasActiveFilters"
-        class="left-nav__item"
-        @click="emit('edit-filters')"
-      >
+      <button v-if="hasActiveFilters" class="left-nav__item" @click="emit('edit-filters')">
         <i class="pi pi-cog"></i>
         <div>
           <span>Редактировать фильтры</span>
