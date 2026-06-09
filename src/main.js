@@ -38,6 +38,19 @@ app.use(PrimeVue, {
       darkModeSelector: false,
     },
   },
+  locale: {
+    startsWith: 'Начинается с',
+    contains: 'Содержит',
+    notContains: 'Не содержит',
+    endsWith: 'Заканчивается на',
+    equals: 'Равно',
+    notEquals: 'Не равно',
+    noFilter: 'Без фильтрации',
+    lt: 'Меньше',
+    lte: 'Меньше или равно',
+    gt: 'Больше',
+    gte: 'Больше или равно',
+  },
 });
 app.use(ToastService);
 
