@@ -104,6 +104,15 @@
         :loading="loadingAnalogs"
         @select="emit('select-analog', $event)"
       />
+
+      <div class="detail-modal__actions">
+        <Button
+          label="Показать на карте"
+          icon="pi pi-map-marker"
+          @click="emit('show-on-map', flat)"
+          class="custom-map-button"
+        />
+      </div>
     </div>
   </Dialog>
 </template>
@@ -156,7 +165,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'select-analog']);
+const emit = defineEmits(['close', 'select-analog', 'show-on-map']);
 
 const visible = computed({
   get: () => props.open,
@@ -420,5 +429,29 @@ const statusText = computed(() => {
   align-items: center;
   gap: 8px;
   color: var(--app-muted-foreground);
+}
+
+.detail-modal__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.custom-map-button,
+.custom-map-button .p-button {
+  padding: 0.5rem 1rem !important;
+  font-size: 1rem !important;
+  min-width: auto !important;
+}
+
+.custom-map-button .p-button-label {
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  display: inline-block !important;
+  margin-left: 0.5rem !important;
+}
+
+.custom-map-button .pi-map-marker {
+  margin-right: 0 !important;
 }
 </style>

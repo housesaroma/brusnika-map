@@ -12,6 +12,7 @@ import 'vue-yandex-maps/css';
 import 'primeicons/primeicons.css';
 import './style.css';
 
+
 const app = createApp(App);
 const pinia = createPinia();
 

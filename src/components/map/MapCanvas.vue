@@ -198,6 +198,10 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  flyToTarget: {
+    type: Array,
+    default: null,
+  },
 });
 
 const emit = defineEmits([
@@ -208,6 +212,7 @@ const emit = defineEmits([
   'update-vertex',
   'favorites',
   'toggle-drawing',
+  'fly-to',
 ]);
 
 // vue-yandex-maps expects v-model value to be stored in shallowRef
@@ -240,6 +245,14 @@ watch(
   (target) => {
     if (!target?.coordinates || !isValidCenter(target.coordinates)) return;
     flyTo(target.coordinates, 16);
+  }
+);
+
+watch(
+  () => props.flyToTarget,
+  (target) => {
+    if (!target || !isValidCenter(target)) return;
+    flyTo(target, 17);
   }
 );
 

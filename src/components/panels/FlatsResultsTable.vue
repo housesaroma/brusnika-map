@@ -390,7 +390,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'flat-click', 'flat-remove', 'clear-selection']);
+const emit = defineEmits(['close', 'flat-click', 'flat-remove', 'clear-selection', 'fly-to']);
 
 const DEFAULT_HEIGHT = 50;
 const MIN_HEIGHT = 220;
@@ -450,6 +450,11 @@ const tableFilters = ref({
 });
 
 const contextMenuItems = computed(() => [
+  {
+    label: 'Показать на карте',
+    icon: 'pi pi-map-marker',
+    command: () => showOnMap(contextMenuFlat.value),
+  },
   {
     label: 'Удалить из списка',
     icon: 'pi pi-trash',
@@ -563,6 +568,11 @@ function handleRowClick(event) {
 function handleRowUnselect(_event) {
   // Сбрасываем выделение при клике вне таблицы
   selectedRows.value = [];
+}
+
+function showOnMap(flat) {
+  if (!flat?.center || !Array.isArray(flat.center) || flat.center.length !== 2) return;
+  emit('fly-to', flat.center);
 }
 
 function showExportMenu(event) {

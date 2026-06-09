@@ -19,6 +19,7 @@
       <MapCanvas
         :center="selectedCity?.center"
         :zoom="12"
+        :fly-to-target="flyToTarget"
         :loading="isMapLoading"
         :loading-phase="loadingPhase"
         :loading-percent="loadingPercent"
@@ -101,6 +102,7 @@
         @flat-click="handleFlatClick"
         @flat-remove="handleFlatRemove"
         @clear-selection="handleClearTableSelection"
+        @fly-to="handleFlyTo"
       />
     </div>
 
@@ -116,6 +118,7 @@
       :loading-analogs="analogsLoading"
       @close="closeDetailModal"
       @select-analog="handleAnalogSelect"
+      @show-on-map="handleShowOnMap"
     />
 
     <ValuationModal
@@ -243,6 +246,7 @@ const drawingEnabledAt = ref(0);
 const heatMode = ref(null);
 
 const searchTarget = ref(null);
+const flyToTarget = ref(null);
 
 const heatmapOptions = computed(() => {
   // Heatmap is built purely on the frontend from already loaded map data.
@@ -755,6 +759,23 @@ function handleFlatRemove(flat) {
 function handleClearTableSelection() {
   // Пустая функция-обработчик для сброса выделения в таблице
   // Выделение сбрасывается внутри компонента FlatsResultsTable
+}
+
+function handleFlyTo(center) {
+  if (!center || !Array.isArray(center) || center.length !== 2) return;
+  flyToTarget.value = center;
+  // Сбрасываем target через небольшую задержку
+  setTimeout(() => {
+    flyToTarget.value = null;
+  }, 1000);
+}
+
+function handleShowOnMap(flat) {
+  if (!flat?.center || !Array.isArray(flat.center) || flat.center.length !== 2) return;
+  // Закрываем модальное окно
+  showDetailModal.value = false;
+  // Перемещаем карту к объекту
+  handleFlyTo(flat.center);
 }
 
 function handleAnalogSelect(analog) {
